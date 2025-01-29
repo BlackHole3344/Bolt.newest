@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect , useRef} from 'react';
 import { useLocation } from 'react-router-dom';
 import {  MessageSquare, Play, X, Moon, Sun } from 'lucide-react';
 import { Loader2, CheckCircle2, Send } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import CodeEditor from '@uiw/react-textarea-code-editor';
+import axios from 'axios';
+import { parseTemplateToProject } from '../xmlparser';
+import { reactxml , nodexml} from '../xmlparser';
 import { 
   Folder, 
   FileCode2, 
@@ -48,6 +51,32 @@ export default function WorkspacePage() {
     { id: 3, title : " " , content: "Implementing functionality...", status: "waiting" },
     { id: 4, title : " " ,content: "Optimizing and finalizing...", status: "waiting" }
   ]);
+
+
+
+
+  console.log(initialPrompt)
+
+  const isInitialMount = useRef(true);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    const project = parseTemplateToProject(nodexml , initialPrompt)
+    console.log(JSON.stringify(project, null, 2));
+
+    axios.post(`http://localhost:3000/template`, { messages: initialPrompt })
+      .then(response => {
+        console.log("backend response", response);
+      })
+      .catch(error => {
+        console.error('Error making backend request:', error);
+      });
+  }, [initialPrompt]);
+
 
 
   const StatusIcon = ({ status }: { status: "loading" | "waiting" | "completed" }) => {
@@ -282,7 +311,7 @@ export default function WorkspacePage() {
                   onClick={() => setActiveView('file')}
                   className={`flex items-center px-4 py-3 text-base rounded-lg transition-colors duration-200 font-semibold ${
                     activeView === 'file'
-                      ? 'bg-blue-50 dark:bg-indigo-500/10 text-blue-700 dark:text-indigo-400'
+                      ? 'bg-blue-10 dark:bg-indigo-100/10 text-blue-700 dark:text-indigo-400'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'
                   }`}
                 >

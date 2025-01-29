@@ -12,11 +12,13 @@
   "dependencies": {
     "@uiw/react-textarea-code-editor": "^3.0.2",
     "axios": "^1.7.9",
+    "fast-xml-parser": "^4.2.5",
     "lucide-react": "^0.344.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-resizable-panels": "^2.0.12",
-    "react-router-dom": "^6.22.3"
+    "react-router-dom": "^6.22.3",
+    "xml-js": "^1.6.11"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
