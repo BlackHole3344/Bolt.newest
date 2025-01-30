@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@monaco-editor/loader": "^1.4.0",
+    "@monaco-editor/react": "^4.6.0",
     "@uiw/react-textarea-code-editor": "^3.0.2",
     "axios": "^1.7.9",
     "fast-xml-parser": "^4.2.5",
