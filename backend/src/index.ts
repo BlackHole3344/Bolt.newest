@@ -3,11 +3,11 @@ import dotenv from "dotenv";
 import { getSystemPrompt, userprompt1, userprompt2 } from "./prompts";
 import { AI_client } from "./client";
 import express , { Application } from "express";
-import { frameType } from "./types/generalTypes";
+// import { frameType } from "./types/generalTypes";
 import cors from "cors"
 import { TemplateClass } from "./controllers/templateController";
-
-
+import { ChatController } from "./controllers/chatController";
+import {chat , chat2} from "./testing/chatTemplate"
 
 dotenv.config();
 
@@ -15,11 +15,12 @@ dotenv.config();
 import { getTemplate } from "./controllers/templateController" ; 
 import { TemplatePrompt } from "./defaults/SystemPrompts";
 import { reactBasePrompt } from "./template/react";
+import { FormData } from "@anthropic-ai/sdk/_shims/auto/types";
+import { nodeBaseprompt } from "./template/node";
 
 
 const app : Application = express(); 
 app.use(express.json());
-
 
 export const AI = AI_client.deepseek_client()  
 console.log("llm client initialized") 
@@ -62,8 +63,7 @@ app.post("/template" , async (req , res) => {
   // if(!result?.choices?.[0]?.message?.content) {
   //   res.status(500).json({success : false , message : "llm doesnt respond"})
   // } 
-
-  const result = await TemplateClass.deepseekResponse(messages);
+  const result = await TemplateClass.anthropicResponse(messages);
   console.log(result)   
   res.status(200).json({success : true , message : result});
 
@@ -77,6 +77,28 @@ app.post("/template" , async (req , res) => {
 app.post("/test" , async (req , res) => {
   const {messages} = req.body ; 
   res.status(200).json({success : true , message : reactBasePrompt});
+})
+
+app.post("/test2" , async (req , res ) => {
+
+  res.status(200).json({success : true , data: chat})
+} )
+
+
+
+app.post("/chat" , async (req , res) => {
+  try {
+    const {userPrompt , payload} = req.body;
+
+    console.log(userPrompt)
+    
+    const result = await ChatController.deepSeekChat(payload , userPrompt) ; 
+    
+    res.status(200).json({success : true , message : result})
+  } catch (error) {
+    console.error("error : " , error) 
+    throw error 
+  }
 })
 
 
