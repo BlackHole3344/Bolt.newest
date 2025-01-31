@@ -9,7 +9,7 @@ import { Loader2, CheckCircle2, Send } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import Editor from '@monaco-editor/react';
 import axios from 'axios';
-import { parseTemplateToProject } from '../xmlparser';
+import { nodexml, parseTemplateToProject } from '../xmlparser';
 import { Step, StepType } from '../types/artifact';
 import { Folder, FileCode2, FileType, FileText } from 'lucide-react';
 
@@ -34,6 +34,11 @@ interface FileSystemItem {
 interface TabItem {
   file: FileContent;
   id: string;
+}
+
+interface ParsedContent {
+  description: string;
+  artifact : string 
 }
 
 
@@ -196,7 +201,7 @@ export default function WorkspacePage() {
       })
     );
   };
-
+  /////// finds a file in entire filesystem array 
   const findFileInSystem = (items: FileSystemItem[], targetPath: string): FileSystemItem | undefined => {
     for (const item of items) {
       if (item.path === targetPath) return item;
@@ -277,7 +282,37 @@ export default function WorkspacePage() {
     }
   };
 
-    // Update the file content in the fileSystem
+  function parseContent(input: string): ParsedContent {
+    // Initialize result object
+    const result: ParsedContent = {
+      description: '',
+      artifact: '',
+    };
+  
+    // Extract description (everything before first <boltArtifact>)
+    const descriptionMatch = input.match(/^([\s\S]*?)(?=<boltArtifact|$)/);
+    result.description = descriptionMatch ? descriptionMatch[1].trim() : '';
+  
+    // Extract complete artifact content including tags
+    const artifactRegex = /(<boltArtifact[\s\S]*?<\/boltAction>)/;
+    const artifactMatch = artifactRegex.exec(input);
+    
+    if (artifactMatch && artifactMatch[1]) {
+      result.artifact = artifactMatch[1].trim();
+    }
+  
+    return result;
+  }
+  
+  // Helper function to validate parsed content
+
+  const [isMounting, setIsMounting] = useState(true);
+  const [status, setStatus] = useState<'idle' | 'mounting' | 'updating'>('idle');
+
+  useEffect(() => {
+    init() 
+  },[]);
+  
 
 
 
@@ -291,36 +326,41 @@ export default function WorkspacePage() {
     } 
 
     const {message} = response.data;
-    console.log(parseTemplateToProject(message)) 
+    // console.log(parseTemplateToProject(message)) 
     setSteps(parseTemplateToProject(message).steps.map((x : Step) => ({
       ...x , 
       status : "loading"
     }) ))
 
-    } catch(error){
-      console.error("error : " , error) 
-      throw error 
-    }
+    setStatus('mounting');
+  } catch (error) {
+    console.error("Init error:", error);
+    setStatus('idle');
+  }
 
   }
 
   useEffect(() => {
     // Only process if we have steps
     if (!steps.length) return;
-  
+    console.log(steps.length) 
     const updateFileSystem = async () => {
+      // const updatedSteps = new Set();
+    
       setFileSystem(prevFileSystem => {
         const newFileSystem = [...prevFileSystem];
-         // created a shallow copy of a array(step)
-        
+        const processedSteps = new Set();
+         const pendingSteps = steps.filter(
+          step => step.status === "waiting" || step.status === "loading" 
+         )
          const addToDirectory = (item: FileSystemItem, parentPath: string = '') => {
-          const pathParts = item.path.split('/').filter(Boolean);
-          let currentPath = '';
+          const pathParts = item.path.split('/').filter(Boolean).filter(x => x.trim()); ///removes empty strings , further strip the empty spaces returns a array 
+          let currentPath = ''; 
           let currentSystem = newFileSystem;
   
           // Navigate through path parts to find/create parent directories
-          for (let i = 0; i < pathParts.length - 1; i++) {
-            currentPath += '/' + pathParts[i];
+          for (let i = 0; i < pathParts.length - 1; i++) { /// 
+            currentPath += '/' + pathParts[i]; /// creating a path 
             let dir = findFileInSystem(newFileSystem, currentPath);
   
             if (!dir) {
@@ -353,16 +393,16 @@ export default function WorkspacePage() {
 
           if (step.status === "waiting" || step.status === "loading") { 
 
-          let newItem: FileSystemItem  ; 
+          let newItem: FileSystemItem ; 
 
 
           switch (step.type) {
 
-            case StepType.CreateFile: 
-             newItem = {
+            case StepType.CreateFile: {
+               newItem = {
                 name: step.title,
                 type: "file",
-                path: `/${step.title}`, 
+                path: `/${step.title}`,
                 content: step.code || '',
                 language: step.title.endsWith('.js') ? 'javascript' 
                   : step.title.endsWith('.ts') ? 'typescript'
@@ -370,10 +410,16 @@ export default function WorkspacePage() {
                   : step.title.endsWith('.html') ? 'html'
                   : 'plaintext'
               };
-              if (!findFileInSystem(newFileSystem, newItem.path)) {
-                addToDirectory(newItem);
-              }
-              break;
+              
+              const existingFile = findFileInSystem(newFileSystem, `/${step.title}`);
+            if (existingFile) {
+              existingFile.content = step.code || existingFile.content;
+            } else {
+              addToDirectory(newItem);
+            }
+            processedSteps.add(step.title);
+          
+            }
 
  
             case StepType.CreateFolder: 
@@ -425,30 +471,97 @@ export default function WorkspacePage() {
               return newFileSystem
           
             };
-  
-            // Check if file already exists
-            // if (
-            //   (step.type === StepType.CreateFile || step.type === StepType.CreateFolder) &&
-            //   !findFileInSystem(newFileSystem, newItem.path)
-            // ) {
-            //   newFileSystem.push(newItem);
-            // }
           }
         });
+        if (processedSteps.size > 0) {
+          Promise.resolve().then(() => {
+            setSteps(prev => prev.map(step => ({
+              ...step,
+              status: processedSteps.has(step.title) ? "completed" : step.status
+            })));
+            setStatus('updating');
+          });
+        }
   
         return newFileSystem;
       });
+      // setIsMounting(false);
     };
+
+    // setSteps(prevSteps => 
+    //   prevSteps.map(step => ({
+    //     ...step,
+    //     status: step.status === "loading" ? "completed" : step.status
+    //   }))
+    // );
+    
+    
+    // console.log(FileSystem) 
 
     updateFileSystem();
 
-    console.log(fileSystem)
-  }, [steps]);
+    // console.log(fileSystem)
+  }, [steps , status]);
+
+
+
+  const [description , setDescription] = useState<string>('') ; 
 
   useEffect(() => {
-    init() 
-  },[]);
+    if(status !== 'updating') return ; 
+    let mounted = true;
+    
+    const getUpdates = async () => {
+      try {
+        const { data } = await axios.post(`http://localhost:3000/test2`);
+        if (!mounted) return;
+        
+        const parsed = parseContent(data.data);
+        setDescription(parsed.description);
   
+        const newSteps = parseTemplateToProject(parsed.artifact).steps;
+        
+        // Only update if there are actual changes
+        setSteps(prevSteps => {
+          const hasChanges = newSteps.some(newStep => {
+            const existing = prevSteps.find(s => s.title === newStep.title);
+            return !existing || existing.code !== newStep.code;
+          });
+  
+          if (!hasChanges) return prevSteps;
+  
+          const stepMap = new Map(prevSteps.map(step => [step.title, step]));
+          
+          newSteps.forEach(newStep => {
+            if (stepMap.has(newStep.title)) {
+              const existing = stepMap.get(newStep.title)!;
+              if (existing.code !== newStep.code) {
+                existing.code = newStep.code;
+                existing.status = "loading";
+              }
+            } else {
+              stepMap.set(newStep.title, { ...newStep, status: "loading" });
+            }
+          });
+  
+          setStatus(hasChanges ? 'mounting' : 'idle');
+        return hasChanges ? Array.from(stepMap.values()) : prevSteps;
+        });
+      } catch (error) {
+        console.error("Update error:", error);
+      }
+    };
+  
+
+      getUpdates();
+
+  
+    return () => {
+      mounted = false;
+    };
+  }, [status]);
+
+
 
   const StatusIcon = ({ status } :  { status: "loading" | "waiting" | "completed" }) => {
     if (status === 'loading') {
@@ -494,59 +607,60 @@ export default function WorkspacePage() {
       )}
     </button>
   </div>
-
   <PanelGroup direction="horizontal" className="h-full">
       <Panel defaultSize={25} minSize={20}>
         <div className="h-full bg-gray-50/80 dark:bg-gray-800/60 backdrop-blur-xl border-r border-gray-200 dark:border-gray-700/30 flex flex-col transition-colors duration-200">
           {/* Header */}
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700/30 bg-white/50 dark:bg-gray-800/50 backdrop-blur-lg">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center space-x-2">
-              <MessageSquare className="w-6 h-6" />
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700/30 bg-white/50 dark:bg-gray-800/50 backdrop-blur-lg">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center space-x-2">
+              <MessageSquare className="w-5 h-5 text-blue-500" />
               <span>Generation Progress</span>
             </h2>
-            <p className="text-base text-gray-600 dark:text-gray-400 mt-2 font-medium">
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1.5 font-medium line-clamp-2">
               Prompt: {initialPrompt}
             </p>
           </div>
 
           {/* Progress Steps */}
-          <div className="flex-1 overflow-auto p-6">
-            <div className="space-y-5">
-              {steps.map((message) => (
-                <div
-                  key={message.id}
-                  className="flex items-start space-x-4 p-4 rounded-lg bg-white dark:bg-gray-700/40 shadow-sm hover:shadow-md transition-shadow duration-200"
-                >
-                  <div className="mt-1">
-                    <StatusIcon status={message.status} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-base font-medium text-gray-900 dark:text-white truncate">
-                      {message.title}
-                    </p>
-                    {message.description && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        {message.description}
+          <div className="p-4 flex-1 overflow-auto">
+            <div className="rounded-lg bg-white/70 dark:bg-gray-800/70 shadow-lg ring-1 ring-gray-900/5 dark:ring-white/10 backdrop-blur-sm">
+              <div className="p-2 space-y-1">
+                {steps.map((message) => (
+                  <div
+                    key={message.id}
+                    className="flex items-start space-x-3 p-2 rounded-md hover:bg-gray-50/80 dark:hover:bg-gray-700/40 transition-all duration-200"
+                  >
+                    <div className="mt-0.5 flex-shrink-0">
+                      <StatusIcon status={message.status} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {message.title}
                       </p>
-                    )}
+                      {message.description && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+                          {message.description}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Input Box */}
-          <div className="p-6 mt-auto border-t border-gray-200 dark:border-gray-700/30 bg-white/50 dark:bg-gray-800/50 backdrop-blur-lg">
-            <div className="flex items-center space-x-3">
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700/30 bg-white/50 dark:bg-gray-800/50 backdrop-blur-lg">
+            <div className="flex items-center space-x-2">
               <input
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 placeholder="Type your message..."
-                className="flex-1 px-6 py-3 bg-white dark:bg-gray-700/50 border border-gray-300 dark:border-gray-600/50 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-base font-medium shadow-sm"
+                className="flex-1 px-4 py-2 bg-white/80 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600/50 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500/40 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-sm font-medium shadow-sm transition-all duration-200"
               />
-              <button className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-lg transition-colors duration-200">
-                <Send className="w-6 h-6" />
+              <button className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm hover:shadow transition-all duration-200">
+                <Send className="w-4 h-4" />
               </button>
             </div>
           </div>

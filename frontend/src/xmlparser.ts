@@ -1,3 +1,5 @@
+import { DOMParser } from 'xmldom';
+
 export const nodexml  = `
 <boltArtifact id="node-express-template" title="Node.js + Express Project Template">
   <boltAction type="file" filePath="package.json">
@@ -144,6 +146,7 @@ import { Project } from "./types/artifact";
 function cleanXMLString(input: string): string {
     // Handle template literals
     let cleaned = input.trim();
+
     if (cleaned.startsWith('`') && cleaned.endsWith('`')) {
       cleaned = cleaned.slice(1, -1);
     }
@@ -154,7 +157,7 @@ function cleanXMLString(input: string): string {
     // Escape HTML content
     cleaned = cleaned.replace(/<!doctype\s+html>/gi, '&lt;!doctype html&gt;');
     
-    // Handle CDATA sections for HTML content
+    // Handle CDATA sections for HTML content 
     cleaned = cleaned.replace(
       /(<boltAction[^>]*>)([\s\S]*?)(<\/boltAction>)/g,
       (match, openTag, content, closeTag) => {
@@ -165,6 +168,8 @@ function cleanXMLString(input: string): string {
         return match;
       }
     );
+
+
     
     // Unescape special characters
     cleaned = cleaned.replace(/\\"/g, '"')
@@ -189,18 +194,22 @@ function cleanXMLString(input: string): string {
       
       // Clean input
       const cleanedXml = cleanXMLString(xmlString);
+
       
       const parser = new DOMParser();
       const doc = parser.parseFromString(cleanedXml, 'text/xml');
+
+
       
       // Check for parsing errors
-      const parserError = doc.querySelector('parsererror');
+      const parserError = doc.getElementsByTagName('parsererror')[0];
       if (parserError) {
         throw new Error(parserError.textContent || 'XML parsing error');
       }
       
       // Get all boltAction elements
       const actions = Array.from(doc.getElementsByTagName('boltAction'));
+ 
       
       // Track folders and steps
       const folders = new Set<string>();
@@ -229,6 +238,7 @@ function cleanXMLString(input: string): string {
               }
             });
           }
+
           
           // Get content and handle CDATA sections
           let content = action.textContent || '';
