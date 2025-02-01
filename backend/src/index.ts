@@ -7,7 +7,7 @@ import express , { Application } from "express";
 import cors from "cors"
 import { TemplateClass } from "./controllers/templateController";
 import { ChatController } from "./controllers/chatController";
-import {chat , chat2} from "./testing/chatTemplate"
+import {chat , chat2 , chat3 , chat4} from "./testing/chatTemplate"
 
 dotenv.config();
 
@@ -15,8 +15,7 @@ dotenv.config();
 import { getTemplate } from "./controllers/templateController" ; 
 import { TemplatePrompt } from "./defaults/SystemPrompts";
 import { reactBasePrompt } from "./template/react";
-import { FormData } from "@anthropic-ai/sdk/_shims/auto/types";
-import { nodeBaseprompt } from "./template/node";
+
 
 
 const app : Application = express(); 
@@ -63,7 +62,7 @@ app.post("/template" , async (req , res) => {
   // if(!result?.choices?.[0]?.message?.content) {
   //   res.status(500).json({success : false , message : "llm doesnt respond"})
   // } 
-  const result = await TemplateClass.anthropicResponse(messages);
+  const result = await TemplateClass.deepseekResponse(messages);
   console.log(result)   
   res.status(200).json({success : true , message : result});
 
@@ -83,7 +82,7 @@ app.post("/test" , async (req , res) => {
 app.post("/test2" , async (req , res ) => {
   const {paylaod} = req.body ; 
   console.log(paylaod) 
-  res.status(200).json({success : true , data: chat})
+  res.status(200).json({success : true , data: chat4})
 } )
 
 

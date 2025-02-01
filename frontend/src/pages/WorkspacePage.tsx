@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect , useRef} from 'react';
 import { useLocation } from 'react-router-dom';
-import { MessageSquare,  X, Moon, Sun, ChevronRight } from 'lucide-react';
+import { MessageSquare,  X, Moon, Sun, ChevronRight, Signal } from 'lucide-react';
 import { Loader2, Send } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import Editor from '@monaco-editor/react';
@@ -46,8 +46,9 @@ interface TabItem {
 }
 
 interface ParsedContent {
-  description: string;
+  START_DESCRIPTION : string;
   artifact : string 
+  END_DESCRIPTION : string 
 }
 
 
@@ -341,17 +342,28 @@ export default function WorkspacePage() {
   function parseContent(input: string): ParsedContent {
     // Initialize result object
     const result: ParsedContent = {
-      description: '',
+      START_DESCRIPTION : '',
       artifact: '',
+      END_DESCRIPTION : '' 
     };
   
     // extracts description (everything before first <boltArtifact>)
-    const descriptionMatch = input.match(/^([\s\S]*?)(?=<boltArtifact|$)/);
-    result.description = descriptionMatch ? descriptionMatch[1].trim() : '';
+    const STARTtdesMatch = input.match(/^([\s\S]*?)(?=<boltArtifact|$)/);
+    result.START_DESCRIPTION = STARTtdesMatch ? STARTtdesMatch[1].trim() : '';
   
     // extracts complete artifact content including tags
-    const artifactRegex = /(<boltArtifact[\s\S]*?<\/boltAction>)/;
+    // </boltArtifact>
+    const artifactRegex = /(<boltArtifact[\s\S]*?<\/boltArtifact>)/;
     const artifactMatch = artifactRegex.exec(input);
+   
+    const ENDdesRegex = /<\/boltArtifact>\s*([\s\S]*?)(?=<boltAction|$)/;
+    const ENDdesMatch = input.match(ENDdesRegex); 
+    result.END_DESCRIPTION = ENDdesMatch ? ENDdesMatch[1].trim() : '';
+  
+    
+  
+    
+   
     
     if (artifactMatch && artifactMatch[1]) {
       result.artifact = artifactMatch[1].trim();
@@ -361,7 +373,7 @@ export default function WorkspacePage() {
   }
   
   // Helper function to validate parsed content
-  const [status, setStatus] = useState<'idle' | 'mounting' | 'updating'>('idle');
+  const [status, setStatus] = useState<'idle' | 'mounting' | 'updating'| 'updated'>('idle');
 
 
 
@@ -580,21 +592,28 @@ export default function WorkspacePage() {
   const [description , setDescription] = useState<string>('') ; 
 
   useEffect(() => {
+    if(status === 'updated') return ; 
     if(status !== 'updating') return ; 
     let mounted = true;
     
-    const getUpdates = async () => {
+    const getUpdates = async (signal : AbortSignal) => {
       try {
         const { data } = await axios.post(`http://localhost:3000/test2` , {
-      payload : payloaditems 
-        });
-        if (!mounted) return;
+      payload : payloaditems  
+        } , { signal});
+        // if (!mounted) return;  
+
+        console.log(data) 
         
         const parsed = parseContent(data.data);
-        setDescription(parsed.description);
+        setDescription(parsed.START_DESCRIPTION);
+        console.log(parsed.START_DESCRIPTION)
+        console.log(parsed.END_DESCRIPTION)
+
+        console.log("parsed : " , parsed);
   
         const newSteps = parseTemplateToProject(parsed.artifact).steps;
-        
+        console.log(newSteps) 
         // Only update if there are actual changes
         setSteps(prevSteps => {
           const hasChanges = newSteps.some(newStep => {
@@ -606,6 +625,7 @@ export default function WorkspacePage() {
   
           const stepMap = new Map(prevSteps.map(step => [step.title, step]));
           
+
           newSteps.forEach(newStep => {
             if (stepMap.has(newStep.title)) {
               const existing = stepMap.get(newStep.title)!;
@@ -617,18 +637,17 @@ export default function WorkspacePage() {
               stepMap.set(newStep.title, { ...newStep, status: "loading" });
             }
           });
-  
-          setStatus(hasChanges ? 'mounting' : 'idle');
+          setStatus(hasChanges ? 'updating' : 'idle');
         return hasChanges ? Array.from(stepMap.values()) : prevSteps;
         });
       } catch (error) {
         console.error("Update error:", error);
       }
     };
-  
     setTimeout( () => {
-
-      getUpdates()
+      controllerRef.current = new AbortController();
+      getUpdates(controllerRef.current.signal)
+      setStatus("updated")
 
     } , 3000)
       
@@ -637,7 +656,7 @@ export default function WorkspacePage() {
     return () => {
       mounted = false;
     };
-  }, [fileSystem]);
+  }, [status]);
 
 
 
