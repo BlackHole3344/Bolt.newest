@@ -75,12 +75,14 @@ app.post("/template" , async (req , res) => {
 
 
 app.post("/test" , async (req , res) => {
-  const {messages} = req.body ; 
+  const {messages} = req.body ;
+  console.log(messages) 
   res.status(200).json({success : true , message : reactBasePrompt});
 })
 
 app.post("/test2" , async (req , res ) => {
-
+  const {paylaod} = req.body ; 
+  console.log(paylaod) 
   res.status(200).json({success : true , data: chat})
 } )
 

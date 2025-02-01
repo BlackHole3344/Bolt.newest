@@ -4,12 +4,12 @@
 
 import React, { useState, useEffect , useRef} from 'react';
 import { useLocation } from 'react-router-dom';
-import { MessageSquare, Play, X, Moon, Sun, ChevronRight } from 'lucide-react';
-import { Loader2, CheckCircle2, Send } from 'lucide-react';
+import { MessageSquare,  X, Moon, Sun, ChevronRight } from 'lucide-react';
+import { Loader2, Send } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import Editor from '@monaco-editor/react';
 import axios from 'axios';
-import { nodexml, parseTemplateToProject } from '../xmlparser';
+import {  parseTemplateToProject } from '../xmlparser';
 import { Step, StepType } from '../types/artifact';
 import { Folder, FileCode2, FileType, FileText } from 'lucide-react';
 
@@ -29,6 +29,15 @@ interface FileSystemItem {
   content?: string;
   language?: string;
   path: string;
+}
+
+
+
+export interface Payload{
+  id : number ,
+  prompt? : string ,   
+  artifact? : string , 
+  FileSys? : FileSystemItem     
 }
 
 interface TabItem {
@@ -70,7 +79,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ fileSystem, onFileSelect })
 
     if (item.type === 'directory') {
       return (
-        <div key={item.path}>
+        <div key={item.path.split("/")[1]}>
           <div
             onClick={() => toggleFolder(item.path)}
             className="flex items-center space-x-2 p-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50"
@@ -129,7 +138,7 @@ const FileExplorer: React.FC<FileExplorerProps> = ({ fileSystem, onFileSelect })
   );
 };
 
-// Tab Bar Component
+// Tab Bar Component , tabs 
 const TabBar: React.FC<{
   tabs: TabItem[];
   activeTab: string;
@@ -165,7 +174,7 @@ const TabBar: React.FC<{
 
 export default function WorkspacePage() {
   const location = useLocation();
-  const [activeView, setActiveView] = useState<'code' | 'preview'>('code');
+  const [activeView , setActiveView] = useState<'code' | 'preview'>('code');
   const [openTabs, setOpenTabs] = useState<TabItem[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(() => {
@@ -176,10 +185,15 @@ export default function WorkspacePage() {
     return false;
   });
 
+  const [payloaditems , setPayload ] = useState<Payload[]>([]) ; 
+  const initialized = useRef(false);
+
   const initialPrompt = location.state?.prompt || 'No prompt provided';
+
+
+ ///// Progress panel thing 
   const [steps , setSteps] = useState<Step[]>([]);
-
-
+  ////File explorar panel thing 
   const [fileSystem, setFileSystem] = useState<FileSystemItem[]>([
   ]);
 
@@ -201,6 +215,7 @@ export default function WorkspacePage() {
       })
     );
   };
+
   /////// finds a file in entire filesystem array 
   const findFileInSystem = (items: FileSystemItem[], targetPath: string): FileSystemItem | undefined => {
     for (const item of items) {
@@ -212,6 +227,22 @@ export default function WorkspacePage() {
     }
     return undefined
   };
+
+  // const findFileInSystem  = (filesytem : FileSystemItem[] , path : string ) : FileSystemItem | undefined => {
+  //   for (const item of fileSystem) {
+  //     if (item.path == path) {
+  //       return item ; 
+  //     }
+  //     if(item.children) {
+  //       const exist = findFileInSystem(item.children , path) 
+  //       if (exist){
+  //         return exist 
+  //       }
+  //     }
+
+  //   }
+  //   return undefined
+  // }
   
   const getHTMLContent = () => {
     if (activeView !== 'preview') return '';
@@ -219,17 +250,17 @@ export default function WorkspacePage() {
     return indexHTML?.content || '';
   };
 
-  const handleFileSelect = (file: FileContent) => {
+
+  /////handles on click logic for files 
+  const handleFileSelect = (file : FileContent) => {
     setActiveView('code');
-    
-    // Update step status when file is opened
-    updateStepStatus(file.path);
-    
+    // update step status when file is opened 
+    // updateStepStatus(file.path);   
     const existingTab = openTabs.find(tab => tab.file.path === file.path);
     if (existingTab) {
       setActiveTabId(existingTab.id);
     } else {
-      const newTab = { file, id: `tab-${Date.now()}` };
+      const newTab = { file, id: `tab-${Date.now()}`};
       setOpenTabs([...openTabs, newTab]);
       setActiveTabId(newTab.id);
     }
@@ -242,6 +273,12 @@ export default function WorkspacePage() {
     }
   };
 
+  // const handleTabsClosed = (tabID : string ) => {
+  //   const activeExistingTab = openTabs.filter(tab => tab.id === tabId); 
+
+  // }
+
+  //// updates the code for generation updates from llm 
   const updateFileContent = (path: string, newContent: string) => {
     setFileSystem(prev => {
       const updateFileInTree = (items: FileSystemItem[]): FileSystemItem[] => {
@@ -263,9 +300,28 @@ export default function WorkspacePage() {
     });
   };
 
+  // const updateFilesystem = (path : string , newContent : string  ) => {
+  //   setFileSystem(prev => {
+  //     const updateFileTree = (items : FileSystemItem[]) : FileSystemItem[] => {
+  //       return items.map( item => {
+  //         if(item.path == path && item.type == "file") {
+  //           return {...item , content : newContent }
+  //         } if (item.type == "directory" && item.children) {
+  //           return  {
+  //             ...item , 
+  //             children : updateFileTree(item.children)
+  //           }
+  //         }
+  //         return item ; 
+  //       })
+  //     }
+  //   return updateFileTree(prev) ;
+  // } 
+  //   )
+  // }
+////// edits the content inside files when there is a editor change in monaco 
   const handleEditorChange = (value: string | undefined, tabId: string) => {
     if (!value) return;
-    
     setOpenTabs(tabs =>
       tabs.map(tab =>
         tab.id === tabId
@@ -273,15 +329,15 @@ export default function WorkspacePage() {
           : tab
       )
     );
-  
     const tab = openTabs.find(t => t.id === tabId);
     if (tab) {
-      updateFileContent(tab.file.path, value);
+      updateFileContent(tab.file.path, value); /// updates the file content 
       // Update step status when file is edited
-      updateStepStatus(tab.file.path);
+      // updateStepStatus(tab.file.path);
     }
   };
 
+  ////////// Separates : description and artifact from generation update 
   function parseContent(input: string): ParsedContent {
     // Initialize result object
     const result: ParsedContent = {
@@ -289,11 +345,11 @@ export default function WorkspacePage() {
       artifact: '',
     };
   
-    // Extract description (everything before first <boltArtifact>)
+    // extracts description (everything before first <boltArtifact>)
     const descriptionMatch = input.match(/^([\s\S]*?)(?=<boltArtifact|$)/);
     result.description = descriptionMatch ? descriptionMatch[1].trim() : '';
   
-    // Extract complete artifact content including tags
+    // extracts complete artifact content including tags
     const artifactRegex = /(<boltArtifact[\s\S]*?<\/boltAction>)/;
     const artifactMatch = artifactRegex.exec(input);
     
@@ -305,31 +361,47 @@ export default function WorkspacePage() {
   }
   
   // Helper function to validate parsed content
-
-  const [isMounting, setIsMounting] = useState(true);
   const [status, setStatus] = useState<'idle' | 'mounting' | 'updating'>('idle');
 
+
+
+ 
+  const controllerRef = useRef<AbortController | null>(null);
+   ////// triggered whenever page is loaded (1st event)
   useEffect(() => {
-    init() 
-  },[]);
+    // if (!initialized.current) {
+    //   initialized.current = true;
+    //   init();
+    // }
+    controllerRef.current = new AbortController();
+    init(controllerRef.current.signal);
+
+  return () => {
+    controllerRef.current?.abort();
+  };
+  }, []);
   
 
 
+////////issue./////"prevent init running everytime on reload/////////////
 
-  const init = async ()  => {
-
+  const init = async (signal: AbortSignal)  => {
+    
     try {
-    const response = await axios.post(`http://localhost:3000/test`, { messages: initialPrompt.trim()})
+    const response = await axios.post(`http://localhost:3000/test`, { messages: payloaditems
+    } ,  { signal } )
     console.log("request")
     if(!response) {
       console.log("no response")
     } 
 
-    const {message} = response.data;
-    // console.log(parseTemplateToProject(message)) 
-    setSteps(parseTemplateToProject(message).steps.map((x : Step) => ({
+    const {message} = response.data; 
+    // console.log(parseTemplateToProject(message))
+    
+  ////////parseTemplateToProject(xmlparser) return Step[]  
+   setSteps(parseTemplateToProject(message).steps.map((x : Step) => ({
       ...x , 
-      status : "loading"
+      status : "loading" //// default sets it to loading 
     }) ))
 
     setStatus('mounting');
@@ -339,14 +411,13 @@ export default function WorkspacePage() {
   }
 
   }
-
+  ///// Doubtful about is it working fine or not 
   useEffect(() => {
     // Only process if we have steps
     if (!steps.length) return;
     console.log(steps.length) 
     const updateFileSystem = async () => {
       // const updatedSteps = new Set();
-    
       setFileSystem(prevFileSystem => {
         const newFileSystem = [...prevFileSystem];
         const processedSteps = new Set();
@@ -358,7 +429,7 @@ export default function WorkspacePage() {
           let currentPath = ''; 
           let currentSystem = newFileSystem;
   
-          // Navigate through path parts to find/create parent directories
+          // navigate through path parts to find/create parent directories
           for (let i = 0; i < pathParts.length - 1; i++) { /// 
             currentPath += '/' + pathParts[i]; /// creating a path 
             let dir = findFileInSystem(newFileSystem, currentPath);
@@ -380,11 +451,11 @@ export default function WorkspacePage() {
             }
           }
   
-          // Add the actual item to its parent directory
+          // add the actual item to its parent directory
           if (pathParts.length > 1) {
             currentSystem.push(item);
           } else {
-            // Root level items
+            // root level items
             newFileSystem.push(item);
           }
         };
@@ -497,11 +568,12 @@ export default function WorkspacePage() {
     
     
     // console.log(FileSystem) 
-
-    updateFileSystem();
+    setTimeout(() => {
+    updateFileSystem(); 
+  } , 3000)  
 
     // console.log(fileSystem)
-  }, [steps , status]);
+  }, [status]);
 
 
 
@@ -513,7 +585,9 @@ export default function WorkspacePage() {
     
     const getUpdates = async () => {
       try {
-        const { data } = await axios.post(`http://localhost:3000/test2`);
+        const { data } = await axios.post(`http://localhost:3000/test2` , {
+      payload : payloaditems 
+        });
         if (!mounted) return;
         
         const parsed = parseContent(data.data);
@@ -552,14 +626,18 @@ export default function WorkspacePage() {
       }
     };
   
+    setTimeout( () => {
 
-      getUpdates();
+      getUpdates()
+
+    } , 3000)
+      
 
   
     return () => {
       mounted = false;
     };
-  }, [status]);
+  }, [fileSystem]);
 
 
 
@@ -671,7 +749,7 @@ export default function WorkspacePage() {
     {/* File Explorer Panel */}
     <Panel defaultSize={20} minSize={15}>
           <div className="h-full bg-gray-50 dark:bg-gray-800/60 border-r border-gray-200 dark:border-gray-700/30">
-            <FileExplorer fileSystem={fileSystem} onFileSelect={handleFileSelect} />
+            <FileExplorer fileSystem={fileSystem} onFileSelect={handleFileSelect}/>
           </div>
         </Panel>
         
@@ -681,28 +759,40 @@ export default function WorkspacePage() {
         <Panel defaultSize={55}>
           <div className="h-full flex flex-col bg-white dark:bg-gray-800">
             {/* View Toggle */}
-            <div className="flex items-center p-2 border-b border-gray-200 dark:border-gray-700">
-              <button
-                onClick={() => setActiveView('code')}
-                className={`px-4 py-2 rounded-lg mr-2 ${
-                  activeView === 'code'
-                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                    : 'text-gray-600 dark:text-gray-400'
-                }`}
-              >
-                Code
-              </button>
-              <button
-                onClick={() => setActiveView('preview')}
-                className={`px-4 py-2 rounded-lg ${
-                  activeView === 'preview'
-                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                    : 'text-gray-600 dark:text-gray-400'
-                }`}
-              >
-                Preview
-              </button>
-            </div>
+            <div className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="relative rounded-full w-48 h-10 bg-gray-200 dark:bg-gray-700 p-1">
+        {/* Sliding background */}
+        <div
+          className={`absolute top-1 h-8 w-24 rounded-full bg-blue-900 transition-all duration-300 ease-in-out ${
+            activeView === 'preview' ? 'left-24' : 'left-1'
+          }`}
+        />
+        
+        {/* Buttons container */}
+        <div className="relative flex h-full">
+          <button
+            onClick={() => setActiveView('code')}
+            className={`flex-1 rounded-full text-sm font-medium transition-colors duration-300 z-10 ${
+              activeView === 'code'
+                ? 'text-white'
+                : 'text-gray-600 dark:text-gray-400'
+            }`}
+          >
+            Code
+          </button>
+          <button
+            onClick={() => setActiveView('preview')}
+            className={`flex-1 rounded-full text-sm font-medium transition-colors duration-300 z-10 ${
+              activeView === 'preview'
+                ? 'text-white'
+                : 'text-gray-600 dark:text-gray-400'
+            }`}
+          >
+            Preview
+          </button>
+        </div>
+      </div>
+    </div>
 
             {/* Tab Bar */}
             <TabBar
@@ -717,27 +807,29 @@ export default function WorkspacePage() {
   {activeView === 'code' ? (
     activeTabId ? (
       <Editor
-        height="100%"
-        theme={isDark ? 'vs-dark' : 'light'}
+        height="70%"
+        theme={'vs-dark'}
         language={openTabs.find(tab => tab.id === activeTabId)?.file.language}
         value={openTabs.find(tab => tab.id === activeTabId)?.file.content}
         onChange={(value) => handleEditorChange(value, activeTabId)}
         options={{
-          minimap: { enabled: false },
-          fontSize: 14,
+          minimap: { enabled: true },
+          fontSize: 20,
           lineNumbers: 'on',
-          roundedSelection: false,
+          roundedSelection: true,
           scrollBeyondLastLine: false,
-          readOnly: false,
+          readOnly: false, 
           automaticLayout: true,
+          fontFamily: 'Consolas, "Courier New", monospace'
         }}
       />
-    ) : (
+    ) : ( //// empty screen code screen 
       <div className="h-full w-full flex items-center justify-center text-gray-500 dark:text-gray-400">
         Select a file to start editing
       </div>
     )
-  ) : (
+  ) : /////preview//////component 
+   (
     <div className="h-full w-full bg-white dark:bg-gray-900">
       <iframe
         title="preview"

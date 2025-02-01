@@ -21,6 +21,7 @@ export interface Step{
 
 export interface Project{
     prompt? : string , 
-    steps : Step[] ,
+    steps : Step[],
     error? : string 
 }
+
