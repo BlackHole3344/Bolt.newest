@@ -2,7 +2,8 @@
 
 
 
-import React, { useState, useEffect , useRef} from 'react';
+import React, { useState, useEffect , useRef , useCallback} from 'react';
+// import { NodeJS } from 'node';
 import { useLocation } from 'react-router-dom';
 import { MessageSquare,  X, Moon, Sun, ChevronRight, Signal } from 'lucide-react';
 import { Loader2, Send } from 'lucide-react';
@@ -51,7 +52,10 @@ interface ParsedContent {
   END_DESCRIPTION : string 
 }
 
-
+interface Descriptions{
+  id : number 
+  text : string 
+}
 
 
 
@@ -229,22 +233,7 @@ export default function WorkspacePage() {
     return undefined
   };
 
-  // const findFileInSystem  = (filesytem : FileSystemItem[] , path : string ) : FileSystemItem | undefined => {
-  //   for (const item of fileSystem) {
-  //     if (item.path == path) {
-  //       return item ; 
-  //     }
-  //     if(item.children) {
-  //       const exist = findFileInSystem(item.children , path) 
-  //       if (exist){
-  //         return exist 
-  //       }
-  //     }
-
-  //   }
-  //   return undefined
-  // }
-  
+ 
   const getHTMLContent = () => {
     if (activeView !== 'preview') return '';
     const indexHTML = findFileInSystem(fileSystem, '/public/index.html');
@@ -359,12 +348,6 @@ export default function WorkspacePage() {
     const ENDdesRegex = /<\/boltArtifact>\s*([\s\S]*?)(?=<boltAction|$)/;
     const ENDdesMatch = input.match(ENDdesRegex); 
     result.END_DESCRIPTION = ENDdesMatch ? ENDdesMatch[1].trim() : '';
-  
-    
-  
-    
-   
-    
     if (artifactMatch && artifactMatch[1]) {
       result.artifact = artifactMatch[1].trim();
     }
@@ -400,9 +383,17 @@ export default function WorkspacePage() {
   const init = async (signal: AbortSignal)  => {
     
     try {
+      setPayload(prev =>  {
+        const payload : Payload = {
+          id : payloaditems.length + 1 , prompt : initialPrompt.trim() , 
+        } 
+        return [...prev , payload] 
+      })
     const response = await axios.post(`http://localhost:3000/test`, { messages: payloaditems
     } ,  { signal } )
-    console.log("request")
+    console.log("request") 
+
+
     if(!response) {
       console.log("no response")
     } 
@@ -570,15 +561,7 @@ export default function WorkspacePage() {
       });
       // setIsMounting(false);
     };
-
-    // setSteps(prevSteps => 
-    //   prevSteps.map(step => ({
-    //     ...step,
-    //     status: step.status === "loading" ? "completed" : step.status
-    //   }))
-    // );
-    
-    
+        
     // console.log(FileSystem) 
     setTimeout(() => {
     updateFileSystem(); 
@@ -589,13 +572,31 @@ export default function WorkspacePage() {
 
 
 
-  const [description , setDescription] = useState<string>('') ; 
+  const [description , setDescription] = useState<Descriptions[]>([]); 
+const handleDescriptions = (nDescriptions : Descriptions[]) => {
+  try {
+
+    setDescription(prevDesc => {
+      const newDesc : Descriptions[]   = nDescriptions.filter(desc => !prevDesc.some(prevdesc => prevdesc.text === desc.text));
+      
+      if (newDesc.length == 0) {
+        return [...prevDesc]
+      } 
+      return [...prevDesc , ...newDesc]
+    })
+  
+  } catch(error) {
+    throw error 
+  }
+}
+
 
   useEffect(() => {
     if(status === 'updated') return ; 
     if(status !== 'updating') return ; 
-    let mounted = true;
     
+
+
     const getUpdates = async (signal : AbortSignal) => {
       try {
         const { data } = await axios.post(`http://localhost:3000/test2` , {
@@ -606,10 +607,17 @@ export default function WorkspacePage() {
         console.log(data) 
         
         const parsed = parseContent(data.data);
-        setDescription(parsed.START_DESCRIPTION);
-        console.log(parsed.START_DESCRIPTION)
-        console.log(parsed.END_DESCRIPTION)
 
+        const newDescriptions : Descriptions[] = [
+          {id : description.length + 1 , text : parsed.START_DESCRIPTION } ,
+          {id : description.length + 2 , text : parsed.END_DESCRIPTION }
+        ] 
+
+        handleDescriptions(newDescriptions)
+
+        // setDescription(Prev => [...Prev , ...newDescriptions])
+
+        
         console.log("parsed : " , parsed);
   
         const newSteps = parseTemplateToProject(parsed.artifact).steps;
@@ -654,7 +662,7 @@ export default function WorkspacePage() {
 
   
     return () => {
-      mounted = false;
+      // mounted = false;
     };
   }, [status]);
 
@@ -673,6 +681,7 @@ export default function WorkspacePage() {
   };
 
 
+
   useEffect(() => {
     if (isDark) {
       document.documentElement.classList.add('dark');
@@ -684,6 +693,10 @@ export default function WorkspacePage() {
   }, [isDark]);
 
   const [inputMessage, setInputMessage] = useState("");
+
+
+
+
 
   return (
 
@@ -720,32 +733,64 @@ export default function WorkspacePage() {
 
           {/* Progress Steps */}
           <div className="p-4 flex-1 overflow-auto">
-            <div className="rounded-lg bg-white/70 dark:bg-gray-800/70 shadow-lg ring-1 ring-gray-900/5 dark:ring-white/10 backdrop-blur-sm">
-              <div className="p-2 space-y-1">
-                {steps.map((message) => (
-                  <div
-                    key={message.id}
-                    className="flex items-start space-x-3 p-2 rounded-md hover:bg-gray-50/80 dark:hover:bg-gray-700/40 transition-all duration-200"
-                  >
-                    <div className="mt-0.5 flex-shrink-0">
-                      <StatusIcon status={message.status} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {message.title}
-                      </p>
-                      {message.description && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
-                          {message.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+      <div className="rounded-lg bg-white/70 dark:bg-gray-800/70 shadow-lg ring-1 ring-gray-900/5 dark:ring-white/10 backdrop-blur-sm">
+        <div className="p-4 space-y-4">
+          {/* First Description */}
+          {description.length > 0 && (
+            <div className="flex items-start space-x-4 mb-6">
+              <div className="mt-1.5 flex-shrink-0">
+                <div className="w-3 h-3 rounded-full bg-purple-500 shadow-sm shadow-purple-500/50" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-semibold text-gray-800 dark:text-gray-100 leading-relaxed tracking-wide">
+                  {description[0].text}
+                </p>
               </div>
             </div>
+          )}
+
+          {/* Horizontal Steps Container */}
+          <div className="grid grid-cols-3 gap-4">
+            {steps.map((message, index) => (
+              <div
+                key={message.id}
+                className={`flex items-start space-x-3 ${
+                  index !== steps.length - 1 ? 'border-r border-gray-200 dark:border-gray-700 pr-4' : ''
+                }`}
+              >
+                <div className="mt-1.5 flex-shrink-0">
+                  <StatusIcon status={message.status} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {message.title}
+                  </p>
+                  {message.description && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {message.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
 
+          {/* Second Description */}
+          {description.length > 1 && (
+            <div className="flex items-start space-x-4 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-1.5 flex-shrink-0">
+                <div className="w-3 h-3 rounded-full bg-purple-500 shadow-sm shadow-purple-500/50" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-semibold text-gray-800 dark:text-gray-100 leading-relaxed tracking-wide">
+                  {description[1].text}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
           {/* Input Box */}
           <div className="p-4 border-t border-gray-200 dark:border-gray-700/30 bg-white/50 dark:bg-gray-800/50 backdrop-blur-lg">
             <div className="flex items-center space-x-2">
