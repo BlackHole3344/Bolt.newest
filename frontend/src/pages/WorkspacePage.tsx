@@ -389,6 +389,8 @@ export default function WorkspacePage() {
         } 
         return [...prev , payload] 
       })
+
+    console.log(payloaditems) 
     const response = await axios.post(`http://localhost:3000/test`, { messages: payloaditems
     } ,  { signal } )
     console.log("request") 
@@ -472,9 +474,14 @@ export default function WorkspacePage() {
 
           switch (step.type) {
 
+            
+    
             case StepType.CreateFile: {
+
+              const pathArray = step.title.split("/")
                newItem = {
-                name: step.title,
+                // name: (step.title.split("/").length > 1) ? step.title.split("/")[-1] : step.title,
+                name: pathArray[pathArray.length - 1],
                 type: "file",
                 path: `/${step.title}`,
                 content: step.code || '',
@@ -497,8 +504,10 @@ export default function WorkspacePage() {
 
  
             case StepType.CreateFolder: 
+            const pathArray = step.title.split("/")
+
                 newItem = {
-                  name: step.title,
+                  name: pathArray[pathArray.length - 1],
                   type: "directory",
                   path: `/${step.title}`, // You might want to adjust the path based on your needs
                   children: []
@@ -567,7 +576,7 @@ export default function WorkspacePage() {
     updateFileSystem(); 
   } , 3000)  
 
-    // console.log(fileSystem)
+    console.log("filesystem : " ,fileSystem)
   }, [status]);
 
 
@@ -618,10 +627,10 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
         // setDescription(Prev => [...Prev , ...newDescriptions])
 
         
-        console.log("parsed : " , parsed);
+        // console.log("parsed : " , parsed);
   
         const newSteps = parseTemplateToProject(parsed.artifact).steps;
-        console.log(newSteps) 
+        // console.log(newSteps) 
         // Only update if there are actual changes
         setSteps(prevSteps => {
           const hasChanges = newSteps.some(newStep => {
@@ -656,7 +665,7 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
       controllerRef.current = new AbortController();
       getUpdates(controllerRef.current.signal)
       setStatus("updated")
-
+      console.log(fileSystem)
     } , 3000)
       
 
