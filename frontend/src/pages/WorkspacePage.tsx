@@ -1,7 +1,8 @@
 
 
 
-
+import { InitWebContainer } from '../webcontainerAuth';
+import { WebContainer } from '@webcontainer/api';
 import React, { useState, useEffect , useRef , useCallback} from 'react';
 // import { NodeJS } from 'node';
 import { useLocation } from 'react-router-dom';
@@ -14,7 +15,8 @@ import {  parseTemplateToProject } from '../xmlparser';
 import { Step, StepType } from '../types/artifact';
 import { Folder, FileCode2, FileType, FileText } from 'lucide-react';
 
-  
+InitWebContainer() 
+
 
 interface FileContent {
   name: string;
@@ -356,11 +358,8 @@ export default function WorkspacePage() {
   }
   
   // Helper function to validate parsed content
-  const [status, setStatus] = useState<'idle' | 'mounting' | 'updating'| 'updated'>('idle');
+  const [updatePhase, setUpdatePhase] = useState<'idle' | 'initial' |  'mounting' | 'updating'| 'Done'>('idle');
 
-
-
- 
   const controllerRef = useRef<AbortController | null>(null);
    ////// triggered whenever page is loaded (1st event)
   useEffect(() => {
@@ -370,7 +369,6 @@ export default function WorkspacePage() {
     // }
     controllerRef.current = new AbortController();
     init(controllerRef.current.signal);
-
   return () => {
     controllerRef.current?.abort();
   };
@@ -383,11 +381,13 @@ export default function WorkspacePage() {
   const init = async (signal: AbortSignal)  => {
     
     try {
+
       setPayload(prev =>  {
         const payload : Payload = {
           id : payloaditems.length + 1 , prompt : initialPrompt.trim() , 
         } 
         return [...prev , payload] 
+      
       })
 
     console.log(payloaditems) 
@@ -407,18 +407,19 @@ export default function WorkspacePage() {
    setSteps(parseTemplateToProject(message).steps.map((x : Step) => ({
       ...x , 
       status : "loading" //// default sets it to loading 
-    }) ))
-
-    setStatus('mounting');
+    }) )  
+  )
+  setUpdatePhase("initial")    
   } catch (error) {
     console.error("Init error:", error);
-    setStatus('idle');
+    setUpdatePhase('idle');
   }
-
   }
   ///// Doubtful about is it working fine or not 
   useEffect(() => {
     // Only process if we have steps
+
+    if(updatePhase === "Done") return ; 
     if (!steps.length) return;
     console.log(steps.length) 
     const updateFileSystem = async () => {
@@ -473,11 +474,7 @@ export default function WorkspacePage() {
 
 
           switch (step.type) {
-
-            
-    
             case StepType.CreateFile: {
-
               const pathArray = step.title.split("/")
                newItem = {
                 // name: (step.title.split("/").length > 1) ? step.title.split("/")[-1] : step.title,
@@ -552,7 +549,6 @@ export default function WorkspacePage() {
 
             default : 
               return newFileSystem
-          
             };
           }
         });
@@ -562,26 +558,123 @@ export default function WorkspacePage() {
               ...step,
               status: processedSteps.has(step.title) ? "completed" : step.status
             })));
-            setStatus('updating');
+            
           });
         }
-  
+
+        if(updatePhase == "initial") {
+          setUpdatePhase("updating") 
+        }else {
+          setUpdatePhase("Done")
+        }
         return newFileSystem;
       });
       // setIsMounting(false);
     };
-        
     // console.log(FileSystem) 
     setTimeout(() => {
     updateFileSystem(); 
   } , 3000)  
-
     console.log("filesystem : " ,fileSystem)
-  }, [status]);
+  }, [updatePhase]);
 
 
 
-  const [description , setDescription] = useState<Descriptions[]>([]); 
+
+
+
+  function transformToWebContainerFormat(files: FileSystemItem[]) {
+    const webContainerFiles: any = {};
+    
+    function processItem(item: FileSystemItem): { directory?: any; file?: { contents: string } } {
+      if (item.type === 'directory') {
+        return {
+          directory: item.children?.reduce((acc, child) => ({
+            ...acc,
+            [child.name]: processItem(child)
+          }), {})
+        };
+      } else {
+        return {
+          file: {
+            contents: item.content || ''
+          }
+        };
+      }
+    }
+  
+    // Process root level items
+    files.forEach(item => {
+      if (item.path.includes('/')) {
+        // Handle nested paths
+        const parts = item.path.split('/').filter(Boolean);
+        let current = webContainerFiles;
+        
+        parts.slice(0, -1).forEach(part => {
+          current[part] = current[part] || { directory: {} };
+          current = current[part].directory;
+        });
+        
+        const fileName = parts[parts.length - 1];
+        if (item.type === 'directory') {
+          current[fileName] = processItem(item);
+        } else {
+          current[fileName] = {
+            file: {
+              contents: item.content || ''
+            }
+          };
+        }
+      } else {
+        webContainerFiles[item.name] = processItem(item);
+      }
+    });
+  
+    return webContainerFiles;
+  }
+
+
+ const webcontainerfiles = transformToWebContainerFormat(fileSystem) 
+ console.log("webcontainerfiles : " , webcontainerfiles) 
+
+  
+
+
+//  useEffect(() => {
+
+//   if (updatePhase !== "Done") return;
+
+
+
+//   async function setupWebContainer() {
+//   try {
+
+//   const webcontainerInstance = await WebContainer.boot() 
+//   const files = transformToWebContainerFormat(fileSystem);
+//   await webcontainerInstance.mount(files)
+
+
+//   const installProcess = await webcontainerInstance.spawn('npm' , ['install']) ;
+//   await installProcess.exit;
+
+//   const devProcess = await webcontainerInstance.spawn('npm' , ['run' , 'dev'])
+
+//  devProcess.output.pipeTo(new WritableStream({
+//   write(chunk) {
+//     console.log("Server output :" , chunk) ;
+//   }
+//  })) 
+
+// }catch(error) {
+//   console.error("webContainer setup failed :" , error)
+// }
+// } 
+//  setupWebContainer()
+//  }, [updatePhase])
+
+
+
+const [description , setDescription] = useState<Descriptions[]>([]); 
 const handleDescriptions = (nDescriptions : Descriptions[]) => {
   try {
 
@@ -600,12 +693,17 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
 }
 
 
+
+
+
+
+
+
+
   useEffect(() => {
-    if(status === 'updated') return ; 
-    if(status !== 'updating') return ; 
-    
-
-
+    // if(status === 'updated') return ; 
+    if(updatePhase !== 'updating') return;
+    // if(updatePhase === 'Done') return ;  
     const getUpdates = async (signal : AbortSignal) => {
       try {
         const { data } = await axios.post(`http://localhost:3000/test2` , {
@@ -624,10 +722,6 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
 
         handleDescriptions(newDescriptions)
 
-        // setDescription(Prev => [...Prev , ...newDescriptions])
-
-        
-        // console.log("parsed : " , parsed);
   
         const newSteps = parseTemplateToProject(parsed.artifact).steps;
         // console.log(newSteps) 
@@ -654,7 +748,8 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
               stepMap.set(newStep.title, { ...newStep, status: "loading" });
             }
           });
-          setStatus(hasChanges ? 'updating' : 'idle');
+        // setStatus('updating');
+        setUpdatePhase("updating") 
         return hasChanges ? Array.from(stepMap.values()) : prevSteps;
         });
       } catch (error) {
@@ -664,18 +759,17 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
     setTimeout( () => {
       controllerRef.current = new AbortController();
       getUpdates(controllerRef.current.signal)
-      setStatus("updated")
+      // setStatus("updated")
       console.log(fileSystem)
     } , 3000)
       
-
-  
     return () => {
       // mounted = false;
     };
-  }, [status]);
 
+  }, [fileSystem]);
 
+  console.log(updatePhase)
 
   const StatusIcon = ({ status } :  { status: "loading" | "waiting" | "completed" }) => {
     if (status === 'loading') {
@@ -688,6 +782,8 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
     }
     return <div className="w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700" />;
   };
+
+
 
 
 
