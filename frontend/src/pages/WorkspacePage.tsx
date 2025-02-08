@@ -1,12 +1,13 @@
 
 
 
-import { InitWebContainer } from '../webcontainerAuth';
+import { InitWebContainer } from '../webcontainerAuth'; 
+import { useWebContainer } from '../hooks/WebContainerLoad'; 
 import { WebContainer } from '@webcontainer/api';
 import React, { useState, useEffect , useRef , useCallback} from 'react';
 // import { NodeJS } from 'node';
 import { useLocation } from 'react-router-dom';
-import { MessageSquare,  X, Moon, Sun, ChevronRight, Signal } from 'lucide-react';
+import { MessageSquare,  X, Moon, Sun, ChevronRight, Signal, LucideReceiptPoundSterling } from 'lucide-react';
 import { Loader2, Send } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import Editor from '@monaco-editor/react';
@@ -14,7 +15,8 @@ import axios from 'axios';
 import {  parseTemplateToProject } from '../xmlparser';
 import { Step, StepType } from '../types/artifact';
 import { Folder, FileCode2, FileType, FileText } from 'lucide-react';
-
+/////Hooks/////////////////
+import {WebContainerBoot} from "../hooks/WebContainerBoot"
 InitWebContainer() 
 
 
@@ -25,7 +27,7 @@ interface FileContent {
   path: string;
 }
 
-interface FileSystemItem {
+export interface FileSystemItem {
   name: string;
   type: 'file' | 'directory';
   children?: FileSystemItem[];
@@ -179,7 +181,7 @@ const TabBar: React.FC<{
   );
 };
 
-export default function WorkspacePage() {
+export default async function WorkspacePage() {
   const location = useLocation();
   const [activeView , setActiveView] = useState<'code' | 'preview'>('code');
   const [openTabs, setOpenTabs] = useState<TabItem[]>([]);
@@ -195,6 +197,8 @@ export default function WorkspacePage() {
   const [payloaditems , setPayload ] = useState<Payload[]>([]) ; 
   const initialized = useRef(false);
 
+  
+
   const initialPrompt = location.state?.prompt || 'No prompt provided';
 
 
@@ -207,21 +211,21 @@ export default function WorkspacePage() {
 
 
 
-  const updateStepStatus = (filePath: string) => {
-    setSteps(prevSteps => 
-      prevSteps.map(step => {
-        // Only update status for file-related operations
-        if (
-          `/${step.title}` === filePath && 
-          step.status !== "completed" &&
-          (step.type === StepType.CreateFile || step.type === StepType.EditFile)
-        ) {
-          return { ...step, status: "completed" };
-        }
-        return step;
-      })
-    );
-  };
+  // const updateStepStatus = (filePath: string) => {
+  //   setSteps(prevSteps => 
+  //     prevSteps.map(step => {
+  //       // Only update status for file-related operations
+  //       if (
+  //         `/${step.title}` === filePath && 
+  //         step.status !== "completed" &&
+  //         (step.type === StepType.CreateFile || step.type === StepType.EditFile)
+  //       ) {
+  //         return { ...step, status: "completed" };
+  //       }
+  //       return step;
+  //     })
+  //   );
+  // };
 
   /////// finds a file in entire filesystem array 
   const findFileInSystem = (items: FileSystemItem[], targetPath: string): FileSystemItem | undefined => {
@@ -291,26 +295,6 @@ export default function WorkspacePage() {
       return updateFileInTree(prev);
     });
   };
-
-  // const updateFilesystem = (path : string , newContent : string  ) => {
-  //   setFileSystem(prev => {
-  //     const updateFileTree = (items : FileSystemItem[]) : FileSystemItem[] => {
-  //       return items.map( item => {
-  //         if(item.path == path && item.type == "file") {
-  //           return {...item , content : newContent }
-  //         } if (item.type == "directory" && item.children) {
-  //           return  {
-  //             ...item , 
-  //             children : updateFileTree(item.children)
-  //           }
-  //         }
-  //         return item ; 
-  //       })
-  //     }
-  //   return updateFileTree(prev) ;
-  // } 
-  //   )
-  // }
 ////// edits the content inside files when there is a editor change in monaco 
   const handleEditorChange = (value: string | undefined, tabId: string) => {
     if (!value) return;
@@ -339,8 +323,8 @@ export default function WorkspacePage() {
     };
   
     // extracts description (everything before first <boltArtifact>)
-    const STARTtdesMatch = input.match(/^([\s\S]*?)(?=<boltArtifact|$)/);
-    result.START_DESCRIPTION = STARTtdesMatch ? STARTtdesMatch[1].trim() : '';
+    const STARTdesMatch = input.match(/^([\s\S]*?)(?=<boltArtifact|$)/);
+    result.START_DESCRIPTION = STARTdesMatch ? STARTdesMatch[1].trim() : '';
   
     // extracts complete artifact content including tags
     // </boltArtifact>
@@ -358,30 +342,28 @@ export default function WorkspacePage() {
   }
   
   // Helper function to validate parsed content
-  const [updatePhase, setUpdatePhase] = useState<'idle' | 'initial' |  'mounting' | 'updating'| 'Done'>('idle');
+  const [updatePhase, setUpdatePhase] = useState<'idle' | 'initial' |  'mounting' | 'updated'| 'Done'>('idle');
 
-  const controllerRef = useRef<AbortController | null>(null);
+  const controllerRef = useRef<AbortController | null>(null); ///// hook which persist across every re-render , either it can hold AbortController or null 
    ////// triggered whenever page is loaded (1st event)
   useEffect(() => {
     // if (!initialized.current) {
     //   initialized.current = true;
     //   init();
     // }
-    controllerRef.current = new AbortController();
-    init(controllerRef.current.signal);
+    //////
+    controllerRef.current = new AbortController(); //// setting current value to AbortController 
+    init(controllerRef.current.signal); /// when init is done , in callback we just set the  signal to abort and axios throws error 
   return () => {
     controllerRef.current?.abort();
   };
-  }, []);
+  }, []); //// runs on [] event (every reload )
   
 
 
 ////////issue./////"prevent init running everytime on reload/////////////
-
-  const init = async (signal: AbortSignal)  => {
-    
+ const init = async (signal: AbortSignal)  => {
     try {
-
       setPayload(prev =>  {
         const payload : Payload = {
           id : payloaditems.length + 1 , prompt : initialPrompt.trim() , 
@@ -389,20 +371,15 @@ export default function WorkspacePage() {
         return [...prev , payload] 
       
       })
-
     console.log(payloaditems) 
     const response = await axios.post(`http://localhost:3000/test`, { messages: payloaditems
-    } ,  { signal } )
+    } ,  { signal : signal } )
     console.log("request") 
-
-
     if(!response) {
       console.log("no response")
     } 
-
     const {message} = response.data; 
     // console.log(parseTemplateToProject(message))
-    
   ////////parseTemplateToProject(xmlparser) return Step[]  
    setSteps(parseTemplateToProject(message).steps.map((x : Step) => ({
       ...x , 
@@ -416,10 +393,11 @@ export default function WorkspacePage() {
   }
   }
   ///// Doubtful about is it working fine or not 
+  
+  ///////////////////////////FILE-SETUP\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
   useEffect(() => {
     // Only process if we have steps
-
-    if(updatePhase === "Done") return ; 
+    if(updatePhase === "Done" || updatePhase === "idle") return; 
     if (!steps.length) return;
     console.log(steps.length) 
     const updateFileSystem = async () => {
@@ -427,9 +405,9 @@ export default function WorkspacePage() {
       setFileSystem(prevFileSystem => {
         const newFileSystem = [...prevFileSystem];
         const processedSteps = new Set();
-         const pendingSteps = steps.filter(
-          step => step.status === "waiting" || step.status === "loading" 
-         )
+        //  const pendingSteps = steps.filter(
+        //   step => step.status === "waiting" || step.status === "loading" 
+        //  )
          const addToDirectory = (item: FileSystemItem, parentPath: string = '') => {
           const pathParts = item.path.split('/').filter(Boolean).filter(x => x.trim()); ///removes empty strings , further strip the empty spaces returns a array 
           let currentPath = ''; 
@@ -561,9 +539,8 @@ export default function WorkspacePage() {
             
           });
         }
-
         if(updatePhase == "initial") {
-          setUpdatePhase("updating") 
+          setUpdatePhase("updated") 
         }else {
           setUpdatePhase("Done")
         }
@@ -579,130 +556,10 @@ export default function WorkspacePage() {
   }, [updatePhase]);
 
 
-
-
-
-
-  function transformToWebContainerFormat(files: FileSystemItem[]) {
-    const webContainerFiles: any = {};
-    
-    function processItem(item: FileSystemItem): { directory?: any; file?: { contents: string } } {
-      if (item.type === 'directory') {
-        return {
-          directory: item.children?.reduce((acc, child) => ({
-            ...acc,
-            [child.name]: processItem(child)
-          }), {})
-        };
-      } else {
-        return {
-          file: {
-            contents: item.content || ''
-          }
-        };
-      }
-    }
-  
-    // Process root level items
-    files.forEach(item => {
-      if (item.path.includes('/')) {
-        // Handle nested paths
-        const parts = item.path.split('/').filter(Boolean);
-        let current = webContainerFiles;
-        
-        parts.slice(0, -1).forEach(part => {
-          current[part] = current[part] || { directory: {} };
-          current = current[part].directory;
-        });
-        
-        const fileName = parts[parts.length - 1];
-        if (item.type === 'directory') {
-          current[fileName] = processItem(item);
-        } else {
-          current[fileName] = {
-            file: {
-              contents: item.content || ''
-            }
-          };
-        }
-      } else {
-        webContainerFiles[item.name] = processItem(item);
-      }
-    });
-  
-    return webContainerFiles;
-  }
-
-
- const webcontainerfiles = transformToWebContainerFormat(fileSystem) 
- console.log("webcontainerfiles : " , webcontainerfiles) 
-
-  
-
-
-//  useEffect(() => {
-
-//   if (updatePhase !== "Done") return;
-
-
-
-//   async function setupWebContainer() {
-//   try {
-
-//   const webcontainerInstance = await WebContainer.boot() 
-//   const files = transformToWebContainerFormat(fileSystem);
-//   await webcontainerInstance.mount(files)
-
-
-//   const installProcess = await webcontainerInstance.spawn('npm' , ['install']) ;
-//   await installProcess.exit;
-
-//   const devProcess = await webcontainerInstance.spawn('npm' , ['run' , 'dev'])
-
-//  devProcess.output.pipeTo(new WritableStream({
-//   write(chunk) {
-//     console.log("Server output :" , chunk) ;
-//   }
-//  })) 
-
-// }catch(error) {
-//   console.error("webContainer setup failed :" , error)
-// }
-// } 
-//  setupWebContainer()
-//  }, [updatePhase])
-
-
-
-const [description , setDescription] = useState<Descriptions[]>([]); 
-const handleDescriptions = (nDescriptions : Descriptions[]) => {
-  try {
-
-    setDescription(prevDesc => {
-      const newDesc : Descriptions[]   = nDescriptions.filter(desc => !prevDesc.some(prevdesc => prevdesc.text === desc.text));
-      
-      if (newDesc.length == 0) {
-        return [...prevDesc]
-      } 
-      return [...prevDesc , ...newDesc]
-    })
-  
-  } catch(error) {
-    throw error 
-  }
-}
-
-
-
-
-
-
-
-
-
+//////////////STEP-3-REQUEST-GENERATION-FILES////////////////////////////////////////
   useEffect(() => {
     // if(status === 'updated') return ; 
-    if(updatePhase !== 'updating') return;
+    if(updatePhase !== 'updated') return;
     // if(updatePhase === 'Done') return ;  
     const getUpdates = async (signal : AbortSignal) => {
       try {
@@ -710,9 +567,7 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
       payload : payloaditems  
         } , { signal});
         // if (!mounted) return;  
-
         console.log(data) 
-        
         const parsed = parseContent(data.data);
 
         const newDescriptions : Descriptions[] = [
@@ -749,7 +604,7 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
             }
           });
         // setStatus('updating');
-        setUpdatePhase("updating") 
+        setUpdatePhase("updated") 
         return hasChanges ? Array.from(stepMap.values()) : prevSteps;
         });
       } catch (error) {
@@ -762,12 +617,51 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
       // setStatus("updated")
       console.log(fileSystem)
     } , 3000)
-      
+    
     return () => {
       // mounted = false;
     };
 
   }, [fileSystem]);
+
+
+
+ 
+
+
+//  const webcontainerfiles = transformToWebContainerFormat(fileSystem) 
+//  console.log("webcontainerfiles : " , webcontainerfiles) 
+
+  
+const { setupWebContainer , webContainerStatus }  =  await useWebContainer(fileSystem); 
+//////////////WEB-CONTAINER///////////////
+ useEffect(() => {
+  
+  if (updatePhase === "Done" && !webContainerStatus.isBooted) {
+    setupWebContainer();
+  }
+ 
+ } , [updatePhase , webContainerStatus.isBooted ,  setupWebContainer])
+
+
+const [description , setDescription] = useState<Descriptions[]>([]); 
+const handleDescriptions = (nDescriptions : Descriptions[]) => {
+  try {
+
+    setDescription(prevDesc => {
+      const newDesc : Descriptions[]   = nDescriptions.filter(desc => !prevDesc.some(prevdesc => prevdesc.text === desc.text));
+      
+      if (newDesc.length == 0) {
+        return [...prevDesc]
+      } 
+      return [...prevDesc , ...newDesc]
+    })
+  
+  } catch(error) {
+    throw error 
+  }
+}
+
 
   console.log(updatePhase)
 
@@ -823,7 +717,7 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
     </button>
   </div>
   <PanelGroup direction="horizontal" className="h-full">
-      <Panel defaultSize={25} minSize={20}>
+      <Panel key="left-panel" defaultSize={25} minSize={20}>
         <div className="h-full bg-gray-50/80 dark:bg-gray-800/60 backdrop-blur-xl border-r border-gray-200 dark:border-gray-700/30 flex flex-col transition-colors duration-200">
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700/30 bg-white/50 dark:bg-gray-800/50 backdrop-blur-lg">
@@ -913,19 +807,20 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
           </div>
         </div>
       </Panel>
-      <PanelResizeHandle className="w-1.5 bg-gray-200 dark:bg-gray-700/30 hover:bg-blue-500 transition-colors" />
+      <PanelResizeHandle key="handle-1" className="w-1.5 bg-gray-200 dark:bg-gray-700/30 hover:bg-blue-500 transition-colors" />
+      {/* <PanelResizeHandle className="w-1.5 bg-gray-200 dark:bg-gray-700/30 hover:bg-blue-500 transition-colors" /> */}
 
     {/* File Explorer Panel */}
-    <Panel defaultSize={20} minSize={15}>
+    <Panel key="middle-panel" defaultSize={20} minSize={15}>
           <div className="h-full bg-gray-50 dark:bg-gray-800/60 border-r border-gray-200 dark:border-gray-700/30">
             <FileExplorer fileSystem={fileSystem} onFileSelect={handleFileSelect}/>
           </div>
         </Panel>
         
-        <PanelResizeHandle className="w-1.5 bg-gray-200 dark:bg-gray-700/30 hover:bg-blue-500 transition-colors" />
+        <PanelResizeHandle key="handle-2" className="w-1.5 bg-gray-200 dark:bg-gray-700/30 hover:bg-blue-500 transition-colors" />
         
         {/* Editor/Preview Panel */}
-        <Panel defaultSize={55}>
+        <Panel key="right-panel" defaultSize={55}>
           <div className="h-full flex flex-col bg-white dark:bg-gray-800">
             {/* View Toggle */}
             <div className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700">
