@@ -1,47 +1,72 @@
 import { useCallback, useState } from "react"
 import { FileSystemItem } from "../pages/WorkspacePage"
 import { WebContainer } from "@webcontainer/api"
+import {InitWebContainer} from "../webcontainerAuth"
 
 
 
 
-export const useWebContainer = async (filesystem  : FileSystemItem[]) => {
-    const [webContainerStatus ,setupwebContainerStatus] = useState<{isBooted: boolean, error: string | null}>({isBooted : false , error : null}) 
-    
+
+export const useWebContainer = (filesystem  : FileSystemItem[]) => {
+
+
+  const [webContainerStatus ,setupwebContainerStatus] = useState<{isBooted: boolean, error: string | null}>({isBooted : false , error : null}) 
+  const [url, setUrl] = useState("");
+    console.log("Current webContainerStatus:", webContainerStatus); // Add this log
     const setupWebContainer = useCallback(async () => {
+      console.log("SetupWebContainer function called"); 
         try {
-            setupwebContainerStatus({isBooted : false , error : null}) ; 
-            const webContainerInstance = await WebContainer.boot() 
-            console.log("webcontainers  booted" , webContainerInstance)
-            const Transformedfiles = transformToWebContainerFormat(filesystem) ; 
-            await webContainerInstance.mount(Transformedfiles) 
+            // const container = InitWebContainer()
+            // console.log(container)
+            // // setupwebContainerStatus({isBooted : false , error : null}) ;
+            console.log("webContainerStatus:", webContainerStatus);  
+            const wc = await WebContainer.boot() ;
+            if(!wc) {
+               throw new Error("WebContainer failed to boot");
+            }
+            console.log("webcontainers  booted" , wc)
+            const Transformedfiles = await transformToWebContainerFormat(filesystem); 
+
+            await wc.mount(Transformedfiles) 
+            console.log("Files mounted")
+
+            const installed = await installDependencies(wc);
             
-            const installed = await installDependencies(webContainerInstance) ; 
+            console.log("Dependencies Installed")
 
             if(!installed) {
                 throw new Error("files not installed")
             }
 
-            const devProcess = await webContainerInstance.spawn('npm' , ['run' , 'dev'])
+            const devProcess = await wc.spawn('npm' , ['run' , 'dev'])
+
+            console.log("app started :")
+
             devProcess.output.pipeTo(new WritableStream({
              write(chunk) {
                console.log("Server output :" , chunk) ;
              }
+
             })) 
+            wc.on('server-ready', (port, url) => {
+              // ...
+              console.log(url)
+              console.log(port)
+              setUrl(url);
+            })
+
             setupwebContainerStatus({isBooted : true , error : null})
             return true 
         } catch (error) {
             console.log("error : " , error) 
-            setupwebContainerStatus({isBooted : false , error  : error as string | null })
+            setupwebContainerStatus({isBooted : false , error  : error instanceof(Error) ? error.message : "somthing wrong with containers setup"})
             throw error 
         }
 
+
+
     } , [filesystem])
-
-
-    return {setupWebContainer , webContainerStatus}  ; 
-
-
+    return {setupWebContainer , webContainerStatus , url}  ; 
 }
 
 

@@ -1,13 +1,11 @@
 
-
-
-import { InitWebContainer } from '../webcontainerAuth'; 
+/** @type {import('@webcontainer/api').WebContainer}  */
 import { useWebContainer } from '../hooks/WebContainerLoad'; 
-import { WebContainer } from '@webcontainer/api';
+// import { WebContainer } from '@webcontainer/api';
 import React, { useState, useEffect , useRef , useCallback} from 'react';
 // import { NodeJS } from 'node';
 import { useLocation } from 'react-router-dom';
-import { MessageSquare,  X, Moon, Sun, ChevronRight, Signal, LucideReceiptPoundSterling } from 'lucide-react';
+import { MessageSquare,  X, Moon, Sun, ChevronRight, Signal } from 'lucide-react';
 import { Loader2, Send } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import Editor from '@monaco-editor/react';
@@ -16,8 +14,8 @@ import {  parseTemplateToProject } from '../xmlparser';
 import { Step, StepType } from '../types/artifact';
 import { Folder, FileCode2, FileType, FileText } from 'lucide-react';
 /////Hooks/////////////////
-import {WebContainerBoot} from "../hooks/WebContainerBoot"
-InitWebContainer() 
+// import {WebContainerBoot} from "../hooks/WebContainerBoot"
+ 
 
 
 interface FileContent {
@@ -181,11 +179,14 @@ const TabBar: React.FC<{
   );
 };
 
-export default async function WorkspacePage() {
+export default function WorkspacePage() {
   const location = useLocation();
   const [activeView , setActiveView] = useState<'code' | 'preview'>('code');
   const [openTabs, setOpenTabs] = useState<TabItem[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
   const [isDark, setIsDark] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theme') === 'dark' ||
@@ -195,7 +196,7 @@ export default async function WorkspacePage() {
   });
 
   const [payloaditems , setPayload ] = useState<Payload[]>([]) ; 
-  const initialized = useRef(false);
+  // const initialized = useRef(false);
 
   
 
@@ -209,23 +210,6 @@ export default async function WorkspacePage() {
   ]);
 
 
-
-
-  // const updateStepStatus = (filePath: string) => {
-  //   setSteps(prevSteps => 
-  //     prevSteps.map(step => {
-  //       // Only update status for file-related operations
-  //       if (
-  //         `/${step.title}` === filePath && 
-  //         step.status !== "completed" &&
-  //         (step.type === StepType.CreateFile || step.type === StepType.EditFile)
-  //       ) {
-  //         return { ...step, status: "completed" };
-  //       }
-  //       return step;
-  //     })
-  //   );
-  // };
 
   /////// finds a file in entire filesystem array 
   const findFileInSystem = (items: FileSystemItem[], targetPath: string): FileSystemItem | undefined => {
@@ -632,16 +616,31 @@ export default async function WorkspacePage() {
 //  const webcontainerfiles = transformToWebContainerFormat(fileSystem) 
 //  console.log("webcontainerfiles : " , webcontainerfiles) 
 
+
+// async function SetContainers(fileSystem)
   
-const { setupWebContainer , webContainerStatus }  =  await useWebContainer(fileSystem); 
+const { setupWebContainer , webContainerStatus , url}  = useWebContainer(fileSystem); 
+console.log(webContainerStatus) 
+
 //////////////WEB-CONTAINER///////////////
- useEffect(() => {
-  
+useEffect(() => {
+  if(activeView !=="preview") return ; 
+  console.log("Effect running with:", {
+    updatePhase,
+    isBooted: webContainerStatus.isBooted
+  });
+
   if (updatePhase === "Done" && !webContainerStatus.isBooted) {
+    console.log("Conditions met, calling setupWebContainer");
     setupWebContainer();
+  } else {
+    console.log("Conditions not met:", {
+      updatePhaseIsDone: updatePhase === "Done",
+      isNotBooted: !webContainerStatus.isBooted
+    });
   }
- 
- } , [updatePhase , webContainerStatus.isBooted ,  setupWebContainer])
+}, [activeView]); 
+
 
 
 const [description , setDescription] = useState<Descriptions[]>([]); 
@@ -717,7 +716,7 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
     </button>
   </div>
   <PanelGroup direction="horizontal" className="h-full">
-      <Panel key="left-panel" defaultSize={25} minSize={20}>
+      <Panel defaultSize={25} minSize={20}>
         <div className="h-full bg-gray-50/80 dark:bg-gray-800/60 backdrop-blur-xl border-r border-gray-200 dark:border-gray-700/30 flex flex-col transition-colors duration-200">
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700/30 bg-white/50 dark:bg-gray-800/50 backdrop-blur-lg">
@@ -807,20 +806,19 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
           </div>
         </div>
       </Panel>
-      <PanelResizeHandle key="handle-1" className="w-1.5 bg-gray-200 dark:bg-gray-700/30 hover:bg-blue-500 transition-colors" />
-      {/* <PanelResizeHandle className="w-1.5 bg-gray-200 dark:bg-gray-700/30 hover:bg-blue-500 transition-colors" /> */}
+      <PanelResizeHandle className="w-1.5 bg-gray-200 dark:bg-gray-700/30 hover:bg-blue-500 transition-colors" />
 
     {/* File Explorer Panel */}
-    <Panel key="middle-panel" defaultSize={20} minSize={15}>
+    <Panel defaultSize={20} minSize={15}>
           <div className="h-full bg-gray-50 dark:bg-gray-800/60 border-r border-gray-200 dark:border-gray-700/30">
             <FileExplorer fileSystem={fileSystem} onFileSelect={handleFileSelect}/>
           </div>
         </Panel>
         
-        <PanelResizeHandle key="handle-2" className="w-1.5 bg-gray-200 dark:bg-gray-700/30 hover:bg-blue-500 transition-colors" />
+        <PanelResizeHandle className="w-1.5 bg-gray-200 dark:bg-gray-700/30 hover:bg-blue-500 transition-colors" />
         
         {/* Editor/Preview Panel */}
-        <Panel key="right-panel" defaultSize={55}>
+        <Panel defaultSize={55}>
           <div className="h-full flex flex-col bg-white dark:bg-gray-800">
             {/* View Toggle */}
             <div className="flex items-center p-4 border-b border-gray-200 dark:border-gray-700">
@@ -892,22 +890,34 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
         Select a file to start editing
       </div>
     )
-  ) : /////preview//////component 
+  ): /////preview//////component 
    (
     <div className="h-full w-full bg-white dark:bg-gray-900">
-      <iframe
+
+    <div className="text-gray-600 dark:text-gray-300">Loading preview...</div>
+    {/* <iframe
+        ref={iframeRef}
         title="preview"
         className="w-full h-full border-none"
-        srcDoc={getHTMLContent()}
-      />
+        src="about:blank"
+      /> */}
+
+<div className="h-full flex items-center justify-center text-gray-400">
+      {!url && <div className="text-center">
+        <p className="mb-2">Loading...</p>
+      </div>}
+      {url && <iframe width={"100%"} height={"100%"} src={url} />}
     </div>
+    </div>
+    
   )}
 </div>
-  
+
           </div>
     
         </Panel>
   </PanelGroup>
 </div>
   );
+
 }
