@@ -598,12 +598,10 @@ export default function WorkspacePage() {
     setTimeout( () => {
       controllerRef.current = new AbortController();
       getUpdates(controllerRef.current.signal)
-      // setStatus("updated")
       console.log(fileSystem)
     } , 3000)
     
     return () => {
-      // mounted = false;
     };
 
   }, [fileSystem]);
