@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react"
-import { FileSystemItem } from "../pages/WorkspacePage"
+import { FileSystemItem } from '../interface/workspaceInterface'
 import { WebContainer } from "@webcontainer/api"
 import {InitWebContainer} from "../webcontainerAuth"
 

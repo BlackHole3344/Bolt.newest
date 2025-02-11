@@ -1,0 +1,119 @@
+"I'll create a beautiful, production-ready ecommerce website for selling courses using the existing tech stack. The site will feature a clean, modern design with course cards, categories, and a hero section.
+
+<boltArtifact id="ecommerce-courses" title="Ecommerce Course Website">
+  <boltAction type="file" filePath="src/App.tsx">
+import React from 'react';
+import { BookOpen, Clock, Star, Users } from 'lucide-react';
+
+function App() {
+  const courses = [
+    {
+      id: 1,
+      title: 'Mastering React with TypeScript',
+      description: 'Become a React expert with TypeScript best practices',
+      image: 'https://images.unsplash.com/photo-1633356122102-3fe601e05bd2',
+      price: 89.99,
+      rating: 4.8,
+      students: 1200,
+      duration: '12h 30m',
+      category: 'Web Development'
+    },
+    {
+      id: 2,
+      title: 'Advanced Tailwind CSS',
+      description: 'Take your Tailwind skills to the next level',
+      image: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee',
+      price: 59.99,
+      rating: 4.7,
+      students: 950,
+      duration: '8h 45m',
+      category: 'CSS'
+    },
+    {
+      id: 3,
+      title: 'Node.js Backend Mastery',
+      description: 'Build scalable backend systems with Node.js',
+      image: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee',
+      price: 99.99,
+      rating: 4.9,
+      students: 2100,
+      duration: '15h 20m',
+      category: 'Backend Development'
+    }
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-400 py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h1 className="text-4xl sm:text-5xl font-bold text-white mb-6">
+            Learn New Skills Online
+          </h1>
+          <p className="text-xl text-blue-100 mb-8">
+            Explore thousands of courses in programming, design, and more
+          </p>
+          <div className="max-w-md mx-auto">
+            <input
+              type="text"
+              placeholder="Search courses..."
+              className="w-full px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Courses Grid */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          {courses.map((course) => (
+            <div key={course.id} className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
+              <img 
+                src={course.image} 
+                alt={course.title}
+                className="w-full h-48 object-cover"
+              />
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm text-blue-600 font-medium">
+                    {course.category}
+                  </span>
+                  <div className="flex items-center text-yellow-500">
+                    <Star className="w-4 h-4 fill-current" />
+                    <span className="ml-1 text-sm font-medium">
+                      {course.rating}
+                    </span>
+                  </div>
+                </div>
+                <h2 className="text-xl font-bold mb-2">{course.title}</h2>
+                <p className="text-gray-600 mb-4">{course.description}</p>
+                <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                  <div className="flex items-center">
+                    <Users className="w-4 h-4 mr-1" />
+                    <span>{course.students} students</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Clock className="w-4 h-4 mr-1" />
+                    <span>{course.duration}</span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-2xl font-bold text-blue-600">
+                    ${course.price}
+                  </span>
+                  <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200">
+                    Enroll Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default App;
+  </boltAction>
+</boltArtifact>"

@@ -14,62 +14,22 @@ import {  parseTemplateToProject } from '../xmlparser';
 import { Step, StepType } from '../types/artifact';
 import { Folder, FileCode2, FileType, FileText } from 'lucide-react';
 import {  Code, Sparkles } from 'lucide-react';
+import {
+  FileContent,
+  FileSystemItem,
+  Payload,
+  TabItem,
+  ParsedContent,
+  Descriptions,
+  ChatItem,
+  FileExplorerProps
+} from '../interface/workspaceInterface';
+/////Hooks/////////////////
 /////Hooks/////////////////
 // import {WebContainerBoot} from "../hooks/WebContainerBoot"
  
 
 
-interface FileContent {
-  name: string;
-  content: string;
-  language: string;
-  path: string;
-}
-
-export interface FileSystemItem {
-  name: string;
-  type: 'file' | 'directory';
-  children?: FileSystemItem[];
-  content?: string;
-  language?: string;
-  path: string;
-}
-
-
-
-export interface Payload{
-  id : number ,
-  prompt? : string ,   
-  artifact? : string , 
-  FileSys? : FileSystemItem     
-}
-
-interface TabItem {
-  file: FileContent;
-  id: string;
-}
-
-interface ParsedContent {
-  START_DESCRIPTION : string;
-  artifact : string 
-  END_DESCRIPTION : string 
-}
-
-interface Descriptions{
-  id : number 
-  text : string 
-}
-
-interface ChatItem {
-  id : number 
-  chat : string 
-}
-
-
-interface FileExplorerProps {
-  fileSystem: FileSystemItem[];
-  onFileSelect: (file: FileContent) => void;
-}
 
 // File Explorer Component
 const FileExplorer: React.FC<FileExplorerProps> = ({ fileSystem, onFileSelect }) : JSX.Element => {
@@ -331,7 +291,7 @@ export default function WorkspacePage() {
   }
   
   // Helper function to validate parsed content
-  const [updatePhase, setUpdatePhase] = useState<'idle' | 'initial' |  'mounting' | 'updated'| 'Done'>('idle');
+  const [updatePhase, setUpdatePhase] = useState<'idle' | 'initial' |  'mount' | 'update'| 'Done'>('idle');
 
   const controllerRef = useRef<AbortController | null>(null); ///// hook which persist across every re-render , either it can hold AbortController or null 
    ////// triggered whenever page is loaded (1st event)
@@ -346,23 +306,28 @@ export default function WorkspacePage() {
   return () => {
     controllerRef.current?.abort();
   };
-  }, []); //// runs on [] event (every reload )
+  }, [updatePhase]); //// runs on [] event (every reload )
   
 
 
-////////issue./////"prevent init running everytime on reload/////////////
+
  const init = async (signal: AbortSignal)  => {
   if(updatePhase !== "idle") return ; 
     try {
-
-    console.log("payload : " , Chats) 
-    const response = await axios.post(`http://localhost:3000/test`, { messages : Chats.filter(chat => chat.id == 1)} , 
+    // console.log("payload : " , Chats) 
+    const prompt = Chats.filter(chat => chat.id == 1).map(chat => chat.chat)[0]
+    // console.log(prompt)
+    const response = await axios.post(`http://localhost:3000/template`, { messages : prompt.trim()} , 
     { signal : signal } )
     // console.log("request") 
     if(!response) {
       console.log("no response")
     } 
     const {message} = response.data; 
+    setPayload(prevPayload => [
+      ...prevPayload , 
+      {id : prevPayload.length + 1 ,prompt : prompt.trim() , artifact : message} 
+    ])
     // console.log(parseTemplateToProject(message))
   ////////parseTemplateToProject(xmlparser) return Step[]  
    setSteps(parseTemplateToProject(message).steps.map((x : Step) => ({
@@ -378,30 +343,31 @@ export default function WorkspacePage() {
   }
 
 
+
+
   //////////////STEP-3-REQUEST-GENERATION-FILES////////////////////////////////////////
   useEffect(() => {
     // if(status === 'updated') return ; 
-    if(updatePhase !== 'updated') return;
+    if(updatePhase !== 'mount') return;
     // if(updatePhase === 'Done') return ;  
     const getUpdates = async (signal : AbortSignal) => {
       try {
-        const { data } = await axios.post(`http://localhost:3000/test2` , {
+        console.log("payload" , payloaditems) 
+        const { data } = await axios.post(`http://localhost:3000/chat`, {
       payload : payloaditems 
         } , { signal});
         // if (!mounted) return;  
         console.log(data) 
         const parsed = parseContent(data.data);
-
         const newDescriptions : Descriptions[] = [
           {id : description.length + 1 , text : parsed.START_DESCRIPTION } ,
           {id : description.length + 2 , text : parsed.END_DESCRIPTION }
         ] 
-
         handleDescriptions(newDescriptions)
 
   
         const newSteps = parseTemplateToProject(parsed.artifact).steps;
-        // console.log(newSteps) 
+        console.log("new generation steps : " , newSteps) 
         // Only update if there are actual changes
         setSteps(prevSteps => {
           const hasChanges = newSteps.some(newStep => {
@@ -425,8 +391,7 @@ export default function WorkspacePage() {
               stepMap.set(newStep.title, { ...newStep, status: "loading" });
             }
           });
-        // setStatus('updating');
-        setUpdatePhase("updated") 
+        setUpdatePhase("update") 
         return hasChanges ? Array.from(stepMap.values()) : prevSteps;
         });
       } catch (error) {
@@ -442,24 +407,22 @@ export default function WorkspacePage() {
     return () => {
     };
 
-  }, [fileSystem]);
+  }, [updatePhase]);
 
 
   ///// Doubtful about is it working fine or not 
   ///////////////////////////FILE-SETUP\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
   useEffect(() => {
     // Only process if we have steps
-    if(updatePhase === "Done" || updatePhase === "idle") return; 
+    if(updatePhase !== "initial" && updatePhase !== "update") return; 
     if (!steps.length) return;
     console.log(steps.length) 
     const updateFileSystem = async () => {
-      // const updatedSteps = new Set();
+
       setFileSystem(prevFileSystem => {
         const newFileSystem = [...prevFileSystem];
         const processedSteps = new Set();
-        //  const pendingSteps = steps.filter(
-        //   step => step.status === "waiting" || step.status === "loading" 
-        //  )
+
          const addToDirectory = (item: FileSystemItem, parentPath: string = '') => {
           const pathParts = item.path.split('/').filter(Boolean).filter(x => x.trim()); ///removes empty strings , further strip the empty spaces returns a array 
           let currentPath = ''; 
@@ -591,9 +554,14 @@ export default function WorkspacePage() {
             
           });
         }
+        // if(updatePhase == "initial") {
+        //   setUpdatePhase("updated") 
+        // }else {
+        //   setUpdatePhase("Done")
+        // }
         if(updatePhase == "initial") {
-          setUpdatePhase("updated") 
-        }else {
+          setUpdatePhase("mount")
+        } else if(updatePhase == "update") {
           setUpdatePhase("Done")
         }
         return newFileSystem;
@@ -611,7 +579,7 @@ export default function WorkspacePage() {
 
   
 const { setupWebContainer , webContainerStatus , url}  = useWebContainer(fileSystem); 
-console.log(webContainerStatus) 
+// console.log(webContainerStatus) 
 
 //////////////WEB-CONTAINER///////////////
 useEffect(() => {

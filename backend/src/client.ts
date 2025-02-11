@@ -15,6 +15,8 @@ export class AI_client {
           });
     }
 
+
+    
     static deepseek_client = () => {
         return  new OpenAI({
             baseURL: 'https://api.deepseek.com/v1',
