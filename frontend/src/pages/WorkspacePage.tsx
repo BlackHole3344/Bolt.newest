@@ -652,7 +652,7 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
 }
 
 
-  console.log(updatePhase)
+  // console.log(updatePhase)
 
   const StatusIcon = ({ status } :  { status: "loading" | "waiting" | "completed" }) => {
     if (status === 'loading') {
