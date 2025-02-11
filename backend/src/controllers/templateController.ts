@@ -1,5 +1,5 @@
 import { nodeBaseprompt } from "../template/node"; 
-import { reactBasePrompt } from "../template/react";
+import { reactBasePrompt , reactBasePrompt2 } from "../template/react";
 import { frameType } from "../types/generalTypes";
 import { AI } from "../index"
 import {TemplatePrompt} from "../defaults/SystemPrompts"
@@ -12,7 +12,7 @@ export const getTemplate = async (llmResponse : frameType) =>{
             case "node" : 
                 return nodeBaseprompt ; 
            case "react" : 
-                return reactBasePrompt ; 
+                return reactBasePrompt2 ; 
             default : 
                 return "invalid response"  
          
@@ -27,7 +27,7 @@ export const getTemplate = async (llmResponse : frameType) =>{
 export class TemplateClass{
     static deepseekResponse  =  async (message : string) => { 
         try {
-            console.log(message)
+            // console.log(message)
             const result = await (AI as any).chat.completions.create({
             model : "deepseek-chat" , 
             messages : [
@@ -37,9 +37,10 @@ export class TemplateClass{
                 temperature : 0 
             })  
 
-            console.log(result)
+            // console.log(result)
 
             const Framework = (result?.choices[0]?.message.content).toLowerCase() as frameType ; 
+            console.log(Framework)
             return getTemplate(Framework) ; 
         } catch(error) {
             console.error("error :" , error) 
