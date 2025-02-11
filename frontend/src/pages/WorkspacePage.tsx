@@ -608,16 +608,6 @@ export default function WorkspacePage() {
 
   }, [fileSystem]);
 
-
-
- 
-
-
-//  const webcontainerfiles = transformToWebContainerFormat(fileSystem) 
-//  console.log("webcontainerfiles : " , webcontainerfiles) 
-
-
-// async function SetContainers(fileSystem)
   
 const { setupWebContainer , webContainerStatus , url}  = useWebContainer(fileSystem); 
 console.log(webContainerStatus) 
