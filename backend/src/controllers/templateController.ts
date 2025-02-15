@@ -1,12 +1,36 @@
 import { nodeBaseprompt } from "../template/node"; 
 import { reactBasePrompt , reactBasePrompt2 } from "../template/react";
 import { frameType } from "../types/generalTypes";
-import { AI } from "../index"
-import {TemplatePrompt} from "../defaults/SystemPrompts"
-import { AiI } from "../types/generalTypes";
-import { Messages } from "openai/resources/beta/threads/messages";
+import { GenerationResponse, LLMService , UnifiedLLM } from "../services/llm.service";
 
-export const getTemplate = async (llmResponse : frameType) =>{
+
+
+
+
+
+
+
+
+export type ModelType = "deepseek" | "anthropic" | "gemini" 
+
+interface GenerationOptions{ 
+    temperature? : number , 
+    maxTokens? : number 
+}
+
+interface TemplateResponse {
+    frameWork : frameType  
+}
+
+interface ModelConfig {
+    deepseekAPi? : string ; 
+    anthropicAPi?: string ; 
+    geminiAPi? : string 
+}
+
+type Template = string 
+
+export const getTemplate = async (llmResponse : frameType) : Promise<Template>=>{
     try {
         switch (llmResponse) {
             case "node" : 
@@ -14,59 +38,35 @@ export const getTemplate = async (llmResponse : frameType) =>{
            case "react" : 
                 return reactBasePrompt2 ; 
             default : 
-                return "invalid response"  
-         
+                return "invalid response"           
           }  
     } catch(error) {
          console.error("error while getting the template : " , error) 
-         return error 
+         return (error as Error).message
     }
 } 
 
 
-export class TemplateClass{
-    static deepseekResponse  =  async (message : string) => { 
+export class TemplateHandler {
+    private llmService : LLMService 
+    private llmClient : UnifiedLLM  
+    
+    constructor(provider : ModelType) {
+        this.llmService = LLMService.getInstance() 
+        this.llmService.setProvider(provider) 
+        this.llmClient = this.llmService.getClient() 
+    }
+
+
+    async template_api(prompt : string ) {
         try {
-            // console.log(message)
-            const result = await (AI as any).chat.completions.create({
-            model : "deepseek-chat" , 
-            messages : [
-                    { role: "system", content: TemplatePrompt() },  
-                    { role: "user", content: message }  
-                ] , 
-                temperature : 0 
-            })  
-
-            // console.log(result)
-
-            const Framework = (result?.choices[0]?.message.content).toLowerCase() as frameType ; 
-            console.log(Framework)
-            return getTemplate(Framework) ; 
+            const frameWork : GenerationResponse = await this.llmClient.generateTemplate(prompt) 
+            return getTemplate(frameWork.FRAMEWORK) 
         } catch(error) {
-            console.error("error :" , error) 
             throw error 
         }
     }
-
-
-    static anthropicResponse = async (message : string) => {
-        try {
-            const result = await (AI as any).messages.create({
-                model: "claude-3-5-sonnet-20241022",
-                max_tokens: 1024,
-                temperature : 0 ,
-                messages: [  
-                  { role: "user", content: message }],
-                  system : TemplatePrompt()! , 
-                        })
-            console.log((result.content[0] as { text: string }).text);
-            const answer = (result.content[0] as { text: string }).text
-            const Framework = answer.toLowerCase() as frameType ; 
-            const template = await getTemplate(Framework); 
-            return template 
-    }catch(error) {
-        console.error("error : " , error) 
-        throw error  
+    
     }
-}
-}
+
+

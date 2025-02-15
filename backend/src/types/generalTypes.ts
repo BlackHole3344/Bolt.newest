@@ -1,7 +1,7 @@
 
 
 
-export type frameType = "react" | "node" | "nextjs" | null | undefined  
+export type frameType = "react" | "node" | "nextjs" 
 
 export interface AiI {
     chat : string 

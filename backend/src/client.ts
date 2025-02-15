@@ -1,6 +1,7 @@
 import  OpenAI from "openai";
 import Anthropic from '@anthropic-ai/sdk';
 import dotenv from "dotenv"
+import { GoogleGenerativeAI} from "@google/generative-ai";
 dotenv.config() 
 
 
@@ -26,6 +27,10 @@ export class AI_client {
     }
 
 
+    static gemini_client = () => {
+        const genAI = new GoogleGenerativeAI(`${process.env.GEMINI_API_KEY}`) 
+        return genAI.getGenerativeModel({model : "gemini-2.0-flash" })
+    }
 }
 
 
