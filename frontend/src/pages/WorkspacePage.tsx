@@ -600,6 +600,8 @@ useEffect(() => {
   }
 }, [activeView]); 
 
+/////////////////////////////////////////////////////////////// 
+
 
 
 const [description , setDescription] = useState<Descriptions[]>([]); 
@@ -653,6 +655,8 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
   const [isTyping, setIsTyping] = useState(false);
 
 
+
+
   const handleSendMessage = () => {
     try {
       if(inputMessage.trim())  {
@@ -672,6 +676,13 @@ const handleDescriptions = (nDescriptions : Descriptions[]) => {
       throw error  
     }
   }
+
+// async function RevisonChat(){
+//   try {
+//     // const revision = await axios.post()
+//   }
+// } 
+
 
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
