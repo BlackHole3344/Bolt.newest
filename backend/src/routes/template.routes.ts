@@ -3,7 +3,7 @@ import { validateChatRequest } from '../middleware/validateRequest';
 import { validateTemplateRequest } from '../middleware/validateRequest';
 import express from 'express';
 import { TemplateHandler } from '../controllers/templateController';
-import { Express } from 'express';
+// import { Express } from 'express';
 export const TemplateRouter = express.Router();
 
 interface TemplateRequest {
@@ -13,6 +13,7 @@ interface TemplateRequest {
 TemplateRouter.post('/getTemplate', validateTemplateRequest , async (req : Request< {} ,{} , TemplateRequest> , res: Response)=> {
   try {
     const { provider, prompt } = req.body;
+    // console.log(req.body) 
     const templateHandler = new TemplateHandler(provider);
     const template = await templateHandler.template_api(prompt);
 

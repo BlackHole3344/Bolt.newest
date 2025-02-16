@@ -11,8 +11,9 @@ export const ChatRouter = express.Router();
 ChatRouter.post('/getUpdate', validateChatRequest , async (req : Request , res: Response)=> {
   try {
     const { provider, payload } = req.body;
+    console.log(payload[0]) 
     const chatHandler = new ChatHandler(provider);
-    const updateArtifact = await chatHandler.ChatApi(payload);
+    const updateArtifact = await chatHandler.ChatApi(payload[0]);
     
     res.status(200).json({ success : true , message : updateArtifact });
   } catch (error) {

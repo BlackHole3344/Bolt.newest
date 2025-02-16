@@ -1,5 +1,5 @@
 export interface payloadI {
-    userprompt? : string , 
+    prompt? : string , 
     artifact? : string 
 }
 // type payloadType = keyof payload ; 
