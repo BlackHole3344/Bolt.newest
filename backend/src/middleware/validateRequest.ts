@@ -1,16 +1,14 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 
+// interface TemplateMessage 
 interface TemplateRequest {
   provider: "deepseek" | "anthropic" | "gemini";
   prompt: string;
 }
-
+import { payloadI } from '../controllers/chatController';
 interface ChatRequest {
   provider: "deepseek" | "anthropic" | "gemini";
-  payload: {
-    userprompt: string;
-    artifact: string;
-  };
+  payload: payloadI[] 
   temperature?: number;
 }
 
@@ -19,7 +17,8 @@ export const validateTemplateRequest: RequestHandler<{}, any, TemplateRequest> =
   res,
   next
 ) => {
-  const { provider, prompt } = req.body;
+  const {provider , prompt} = req.body;
+
   
   if (!provider || !prompt) {
     res.status(400).json({
@@ -43,7 +42,7 @@ export const validateChatRequest: RequestHandler<{}, any, ChatRequest> = (
   res,
   next
 ) => {
-  const { provider, payload, temperature } = req.body;
+  const { provider, payload } = req.body;
 
   if (!provider || !payload) {
     res.status(400).json({
@@ -52,7 +51,7 @@ export const validateChatRequest: RequestHandler<{}, any, ChatRequest> = (
     });
   }
 
-  if (!payload.userprompt || !payload.artifact) {
+  if (!payload[0].prompt || !payload[0].artifact) {
    res.status(400).json({
       error: 'Missing payload fields',
       required: ['userprompt', 'artifact']
@@ -66,11 +65,11 @@ export const validateChatRequest: RequestHandler<{}, any, ChatRequest> = (
     });
   }
 
-  if (temperature && (temperature < 0 || temperature > 1)) {
-    res.status(400).json({
-      error: 'Temperature must be between 0 and 1'
-    });
-  }
+  // if (temperature && (temperature < 0 || temperature > 1)) {
+  //   res.status(400).json({
+  //     error: 'Temperature must be between 0 and 1'
+  //   });
+  // }
 
   next();
 };

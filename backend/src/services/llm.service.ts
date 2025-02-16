@@ -9,6 +9,8 @@ import { payloadI } from "../controllers/chatController";
 import { ModelType } from "../controllers/templateController"; 
 import { GenerationinstructPrompt, getSystemPrompt } from "../prompts";
 import { getchatTemplate } from "../testing/chatTemplate";
+import {getSytemPrompt2} from "../prompts"
+import { raw } from "express";
 dotenv.config()
 
 interface LLMConfig {
@@ -155,7 +157,7 @@ class UnifiedLLM {
 
 
   async generateUpdate(payload : payloadI , options : GenerationOptions = {} ) {
-    const userprompt = payload.userprompt ; 
+    const userprompt = payload.prompt ; 
     const artifact =  (payload.artifact)?.toString(); 
     if(!userprompt || !artifact) {
       throw new Error("user prompt and artifact is required")
@@ -169,11 +171,11 @@ class UnifiedLLM {
           const deepseekResponse = await this.deepseek.chat.completions.create({
             model: 'deepseek-chat',
             messages: [
-              {role : "system" , content : getSystemPrompt()}, 
-              {role: 'user', content: await getchatTemplate(artifact!) }, 
+              {role : "system" , content : getSytemPrompt2(artifact)}, 
+              {role: 'user', content: await getchatTemplate(artifact!)}, 
               {role  :"user" , content : userprompt!} 
             ],
-            temperature: 0,
+            temperature: 0.6,
             max_tokens: options.maxTokens,
           });
            
@@ -181,8 +183,20 @@ class UnifiedLLM {
             throw new Error("can't fetched response from deepseek") 
           }
           console.log("tokens used : " , deepseekResponse.usage?.total_tokens)
-          const Deepseekdata = deepseekResponse.choices[0].message.content  
-          return Deepseekdata 
+          const Deepseekdata = deepseekResponse.choices[0].message.content   
+          const rawResponse = Deepseekdata!;
+          const cleanedResponse = rawResponse
+          .replace(/```json\n/g, '') // Remove JSON code block start
+          .replace(/```/g, '')       // Remove any remaining code block markers
+          .trim();                   // Remove extra whitespace
+        try {
+          const jsonResponse = JSON.parse(cleanedResponse);
+          return jsonResponse;
+        } catch (parseError) {
+          console.error("Raw response:", rawResponse);
+          console.error("Cleaned response:", cleanedResponse);
+          throw new Error("Failed to parse Deepseek response into structured format");
+        }
         } catch(error) {
           throw error 
         } 
@@ -216,16 +230,29 @@ class UnifiedLLM {
         const model = this.gemini.getGenerativeModel({ 
           model: "gemini-2.0-flash",
         });
-
-        const fullPrompt = `\nSystem : ${getSystemPrompt()}\n${GenerationinstructPrompt()}\nUser: ${await getchatTemplate(artifact!)}\n\nUser: ${userprompt}`
+        
+        const fullPrompt = `\nSystem : ${getSytemPrompt2(artifact)}\n${GenerationinstructPrompt()}\nUser: ${await getchatTemplate(artifact!)}\n\nUser: ${userprompt}`
         console.log("Processing gemini request")   
         const geminiResponse = await model.generateContent(fullPrompt);
+        
         console.log("got Gemini response" , geminiResponse.response.usageMetadata?.totalTokenCount)  
-        if(!geminiResponse.response.text()) {
-          throw new Error("can't fetched response from gemini")  
-        } 
-        const GeminiData = geminiResponse.response.text() 
-        return GeminiData 
+        
+        
+        const rawResponse = geminiResponse.response.text();
+        const cleanedResponse = rawResponse
+          .replace(/```json\n/g, '') // Remove JSON code block start
+          .replace(/```/g, '')       // Remove any remaining code block markers
+          .trim();                   // Remove extra whitespace
+        
+        try {
+          const jsonResponse = JSON.parse(cleanedResponse);
+          console.log("cleaned response : " , cleanedResponse)
+          return jsonResponse;
+        } catch (parseError) {
+          console.error("Raw response:", rawResponse);
+          console.error("Cleaned response:", cleanedResponse);
+          throw new Error("Failed to parse Gemini response into structured format");
+        }
       } catch(error) {
         throw error       
       }

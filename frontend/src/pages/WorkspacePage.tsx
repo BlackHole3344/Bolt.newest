@@ -317,8 +317,8 @@ export default function WorkspacePage() {
     // console.log("payload : " , Chats) 
     const prompt = Chats.filter(chat => chat.id == 1).map(chat => chat.chat)[0]
     // console.log(prompt)
-    const response = await axios.post(`http://localhost:3000/template`, { messages : prompt.trim()} , 
-    { signal : signal } )
+    const response = await axios.post(`http://localhost:3000/api/template/getTemplate`,  {provider : "gemini" , prompt : prompt}
+    ,{signal : signal } )
     // console.log("request") 
     if(!response) {
       console.log("no response")
@@ -353,22 +353,24 @@ export default function WorkspacePage() {
     const getUpdates = async (signal : AbortSignal) => {
       try {
         console.log("payload" , payloaditems) 
-        const { data } = await axios.post(`http://localhost:3000/chat`, {
-      payload : payloaditems 
+        const response = await axios.post(`http://localhost:3000/api/chat/getUpdate`, {
+        provider : "deepseek", payload : payloaditems 
         } , { signal});
         // if (!mounted) return;  
-        console.log(data) 
-        const parsed = parseContent(data.data);
+        // console.log(data) 
+        const { message } = response.data;
+        const { artifact, description } = message;
+      
+        console.log("Artifact:", artifact);    // Plain string
+        console.log("Description:", description);  // Plain string
         const newDescriptions : Descriptions[] = [
-          {id : description.length + 1 , text : parsed.START_DESCRIPTION } ,
-          {id : description.length + 2 , text : parsed.END_DESCRIPTION }
+          {id : description.length + 1 , text : description.toString() } ,
+          // {id : description.length + 2 , text : parsed.END_DESCRIPTION }
         ] 
         handleDescriptions(newDescriptions)
-
-  
-        const newSteps = parseTemplateToProject(parsed.artifact).steps;
+        const newSteps = parseTemplateToProject(artifact).steps;
         console.log("new generation steps : " , newSteps) 
-        // Only update if there are actual changes
+  
         setSteps(prevSteps => {
           const hasChanges = newSteps.some(newStep => {
             const existing = prevSteps.find(s => s.title === newStep.title);
@@ -568,9 +570,13 @@ export default function WorkspacePage() {
       });
       // setIsMounting(false);
     };
+    
     // console.log(FileSystem) 
     setTimeout(() => {
     updateFileSystem(); 
+    if(updatePhase == "update") {
+      console.log("new filesystem" , fileSystem)
+    }
   } , 3000)  
     console.log("filesystem : " ,fileSystem)
   }, [updatePhase]);

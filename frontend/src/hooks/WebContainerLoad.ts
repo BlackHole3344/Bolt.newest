@@ -20,10 +20,15 @@ export const useWebContainer = (filesystem  : FileSystemItem[]) => {
             // console.log(container)
             // // setupwebContainerStatus({isBooted : false , error : null}) ;
             console.log("webContainerStatus:", webContainerStatus);  
+            if (webContainerStatus.isBooted) {
+              console.log("WebContainer already booted");
+              return true;
+            } 
+        
             const wc = await WebContainer.boot() ;
-            if(!wc) {
-               throw new Error("WebContainer failed to boot");
-            }
+            // if(!wc) {
+            //    throw new Error("WebContainer failed to boot");
+            // }
             console.log("webcontainers  booted" , wc)
             const Transformedfiles = await transformToWebContainerFormat(filesystem); 
 
